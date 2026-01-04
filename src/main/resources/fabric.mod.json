@@ -1,31 +1,31 @@
 {
 	"schemaVersion": 1,
-	"id": "modid",
+	"id": "seral",
 	"version": "${version}",
-	"name": "Example mod",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"name": "Seral mod",
+	"description": "This is an seral description! Tell everyone what your mod is about!",
 	"authors": [
 		"Me!"
 	],
 	"contact": {
 		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"sources": "https://github.com/FabricMC/fabric-seral-mod"
 	},
 	"license": "CC0-1.0",
-	"icon": "assets/modid/icon.png",
+	"icon": "assets/seral/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"com.example.ExampleMod"
+			"com.seral.SeralMod"
 		],
 		"client": [
-			"com.example.ExampleModClient"
+			"com.seral.SeralModClient"
 		]
 	},
 	"mixins": [
-		"modid.mixins.json",
+		"seral.mixins.json",
 		{
-			"config": "modid.client.mixins.json",
+			"config": "seral.client.mixins.json",
 			"environment": "client"
 		}
 	],
