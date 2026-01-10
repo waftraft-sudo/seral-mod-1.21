@@ -3,7 +3,10 @@
 	"package": "com.seral.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
-		"SeralMixin"
+		"AutoPlantMixin",
+		"LeavesRandomDropMixin",
+		"LeavesBlockMixin",
+		"SaplingGrowthMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
