@@ -19,11 +19,35 @@ public final class TreeShadeUtils {
         return new Vec3(x, y, z);
     }
 
+    // 四角錐状に分布するランダムなオフセットを生成するヘルパーメソッド
+    // y方向のオフセットの最小値と最大値を調整することで、分布の形状を変えられる
+    // generatePyramidOffsetと同じ内容だが、外側のみをチェックする
+    public static Vec3 generatePyramidOffsetOutline(RandomSource random, int minY, int maxY) {
+        double y = minY + (maxY - minY) * random.nextDouble();
+        double x = (random.nextInt(2) * 2 - 1) * y;
+        double z = (random.nextInt(2) * 2 - 1) * y;
+        return new Vec3(x, y, z);
+    }
+
     // 上方向の四角錘状の範囲に特定のブロックが存在するかをチェックする
     // condition は、チェック対象の位置が条件を満たすかどうかを判定する関数
     public static boolean checkAboveBlocks(ServerLevel level, BlockPos pos, int yStart, int yEnd, int checks, java.util.function.Predicate<BlockPos> condition) {
         for (int i = 0; i < checks; i++) {
             Vec3 offset = generatePyramidOffset(level.getRandom(), yStart, yEnd);
+            BlockPos checkPos = pos.offset((int)Math.round(offset.x), (int)Math.round(offset.y), (int)Math.round(offset.z));
+            if (!condition.test(checkPos)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // 上方向の四角錘状の範囲に特定のブロックが存在するかをチェックする
+    // condition は、チェック対象の位置が条件を満たすかどうかを判定する関数
+    // 外側のみをチェックする
+    public static boolean checkAboveBlocksOutline(ServerLevel level, BlockPos pos, int yStart, int yEnd, int checks, java.util.function.Predicate<BlockPos> condition) {
+        for (int i = 0; i < checks; i++) {
+            Vec3 offset = generatePyramidOffsetOutline(level.getRandom(), yStart, yEnd);
             BlockPos checkPos = pos.offset((int)Math.round(offset.x), (int)Math.round(offset.y), (int)Math.round(offset.z));
             if (!condition.test(checkPos)) {
                 return false;
