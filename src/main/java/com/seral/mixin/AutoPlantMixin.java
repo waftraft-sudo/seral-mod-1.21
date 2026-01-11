@@ -36,7 +36,11 @@ public abstract class AutoPlantMixin {
                     if (level.getBlockState(pos).canBeReplaced() && 
                         level.getBlockState(pos.below()).is(BlockTags.DIRT)) {
                         
-                        // 苗木を設置
+                        // 2. 明るさチェック
+                        if (!level.canSeeSky(pos.above())) {
+                            return;
+                        }
+                        // 3. 苗木を設置
                         level.setBlock(pos, blockItem.getBlock().defaultBlockState(), 3);
                         
                         // アイテムを消費
@@ -44,6 +48,9 @@ public abstract class AutoPlantMixin {
                         if (stack.isEmpty()) {
                             itemEntity.discard();
                         }
+                        // デスポーンタイマーをリセットする
+                        ((ItemEntityAccessor) itemEntity).setAge(0);
+                        itemEntity.setPickUpDelay(0);
                     }
                 }
             }

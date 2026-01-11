@@ -6,7 +6,8 @@
 		"AutoPlantMixin",
 		"LeavesRandomDropMixin",
 		"LeavesBlockMixin",
-		"SaplingGrowthMixin"
+		"SaplingGrowthMixin",
+		"ItemEntityAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1
