@@ -2,7 +2,6 @@ package com.seral.mixin;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
@@ -10,6 +9,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+
+import com.seral.util.LeafUtils;
 import com.seral.util.TreeShadeUtils;
 import com.seral.util.TreeStructure;
 
@@ -31,12 +32,12 @@ public class LeavesBlockMixin {
             return;
         }
 
-        // 0. プレイヤー建築保護
+        // プレイヤー建築保護
         if (state.getValue(BlockStateProperties.PERSISTENT)) {
             return;
         }
 
-        // 3. 幹の探索開始 (真下)
+        // 幹の探索開始 (真下)
         BlockPos startLogPos = null;
         BlockPos.MutableBlockPos cursor = pos.mutable().move(Direction.DOWN);
         for (int i = 0; i < 10; i++) {
@@ -54,25 +55,29 @@ public class LeavesBlockMixin {
             return;
         }
 
+        TreeStructure tree = identifyWholeTree(level, startLogPos);
+
         // ランダムで倒す
-        if (random.nextFloat() <= 0.001f) {
+        if (0.1f / tree.logPositions.size() < random.nextFloat()) { // 大きな木は倒れにくくする
+            return;
+        }
+
+        if (random.nextFloat() < 0.05f) {
             System.out.println("Randomly knocking down tree at " + startLogPos);
-            TreeStructure tree = identifyWholeTree(level, startLogPos);
             knockDownTree(level, tree);
             return;
         }
 
-        TreeStructure tree = identifyWholeTree(level, startLogPos);
-
-        // 2. 日陰判定
-        if (!isInShade(level, tree.highestLogPos, 6, 12, 4)) {
-            return;
+        // 日陰判定
+        if (isInShade(level, tree.highestLogPos, 4, 8, 1)) {
+            if (!TreeShadeUtils.isShadeSapling(LeafUtils.getSapling(level.getBlockState(pos).getBlock())) || random.nextFloat() < 0.1) { // 陰樹は日陰でも倒れにくい
+                System.out.println("Knocking down tree at " + startLogPos + " due to shade.");
+                knockDownTree(level, tree);
+                return;
+            }
         }
 
-        System.out.println("Knocking down tree at " + startLogPos + " due to shade.");
-        knockDownTree(level, tree);
-
-        // // 6. バニラの「倒木」Featureを配置
+        // // バニラの「倒木」Featureを配置
         // // 木の種類（ブロックID）から、対応する Feature ID を決定
         // Identifier featureId = getFallenTreeFeatureId(lowestLogState);
         
@@ -88,23 +93,23 @@ public class LeavesBlockMixin {
         // }
     }
 
-    // ブロックの種類から「倒木Feature」のIDを返すヘルパーメソッド
-    private Identifier getFallenTreeFeatureId(BlockState logState) {
-        String path = "";
+    // // ブロックの種類から「倒木Feature」のIDを返すヘルパーメソッド
+    // private Identifier getFallenTreeFeatureId(BlockState logState) {
+    //     String path = "";
         
-        // バニラの倒木IDは "fallen_樹種" という規則になっている
-        if (logState.is(Blocks.OAK_LOG)) path = "fallen_oak";
-        else if (logState.is(Blocks.BIRCH_LOG)) path = "fallen_birch";
-        else if (logState.is(Blocks.SPRUCE_LOG)) path = "fallen_spruce";
-        else if (logState.is(Blocks.JUNGLE_LOG)) path = "fallen_jungle";
-        // アカシアやダークオークなどはバニラに「倒木Feature」がない場合があるため
-        // 必要なら自作JSON ("lithoverdant:fallen_acacia"等) を指定するか、nullを返して何もしない
+    //     // バニラの倒木IDは "fallen_樹種" という規則になっている
+    //     if (logState.is(Blocks.OAK_LOG)) path = "fallen_oak";
+    //     else if (logState.is(Blocks.BIRCH_LOG)) path = "fallen_birch";
+    //     else if (logState.is(Blocks.SPRUCE_LOG)) path = "fallen_spruce";
+    //     else if (logState.is(Blocks.JUNGLE_LOG)) path = "fallen_jungle";
+    //     // アカシアやダークオークなどはバニラに「倒木Feature」がない場合があるため
+    //     // 必要なら自作JSON ("lithoverdant:fallen_acacia"等) を指定するか、nullを返して何もしない
         
-        if (!path.isEmpty()) {
-            return Identifier.tryParse("minecraft:" + path);
-        }
-        return null;
-    }
+    //     if (!path.isEmpty()) {
+    //         return Identifier.tryParse("minecraft:" + path);
+    //     }
+    //     return null;
+    // }
 
     // ほかの木によって日陰になっているかどうかの判定を行うヘルパーメソッド
     // 上向きピラミッドの指定範囲内に葉ブロックが存在するかをチェックする
@@ -129,14 +134,14 @@ public class LeavesBlockMixin {
         System.out.println("Removing " + tree.logPositions.size() + " logs and placing fallen tree at: " + tree.lowestLogPos);
         System.out.println("/tp @s " + tree.lowestLogPos.getX() + " " + tree.lowestLogPos.getY() + " " + tree.lowestLogPos.getZ());
 
-        // 5. 原木の消去
+        // 原木の消去
         for (BlockPos p : tree.logPositions) {
             level.removeBlock(p, false); 
         }
     }
 
 
-    // // 4. 幅優先探索 (BFS) で木全体を特定
+    // 幅優先探索 (BFS) で木全体を特定
     private static TreeStructure identifyWholeTree(ServerLevel level, BlockPos startLogPos) {        
         Set<BlockPos> visited = new HashSet<>();
         Queue<BlockPos> queue = new ArrayDeque<>();
@@ -172,7 +177,9 @@ public class LeavesBlockMixin {
                         BlockPos neighbor = current.offset(x, y, z);
                         var neighborState = level.getBlockState(neighbor);
 
-                        if (!neighborState.is(BlockTags.LOGS)) {
+                        if (!neighborState.is(BlockTags.LOGS) 
+                            && !neighborState.is(Blocks.MANGROVE_ROOTS)
+                            && !neighborState.is(Blocks.MOSS_CARPET)) {
                             continue;
                         }
                         if (visited.contains(neighbor)) {
