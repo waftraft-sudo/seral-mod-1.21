@@ -1,8 +1,17 @@
 package com.seral.util;
 
+import java.util.Collections;
+import java.util.Set;
+
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.Vec3;
 
 public final class TreeShadeUtils {
@@ -54,5 +63,46 @@ public final class TreeShadeUtils {
             }
         }
         return true;
+    }
+
+    public static void placeLeafLitterRandomAmount(Level level, BlockPos pos) {
+        // 可能な枚数からランダムに1つ選ぶ
+        var possibleValues = BlockStateProperties.SEGMENT_AMOUNT.getPossibleValues();
+        int amount = possibleValues.get(level.random.nextInt(possibleValues.size()));
+        tryPlaceLeafLitter(level, pos, amount);
+    }
+
+    public static boolean tryPlaceLeafLitter(Level level, BlockPos pos, int amount) {        
+
+        // System.out.println("Placing leaf litter at " + pos + " in temperature " + BiomeUtils.getRawTemperature((ServerLevel) level, pos));
+        // System.out.println("/tp @s " + pos.getX() + " " + pos.getY() + " " + pos.getZ());
+
+        BlockState posState = level.getBlockState(pos);
+        Direction dir = Direction.Plane.HORIZONTAL.getRandomDirection(level.random);
+        if (posState.is(Blocks.LEAF_LITTER)) {
+            dir = posState.getValue(BlockStateProperties.HORIZONTAL_FACING);
+            int maxLeafLitterAmount = Collections.max(BlockStateProperties.SEGMENT_AMOUNT.getPossibleValues());
+            int existingAmount = posState.getValue(BlockStateProperties.SEGMENT_AMOUNT);
+            if (maxLeafLitterAmount <= existingAmount) {
+                return false; // 既に最大量がある場合は置けない
+            }
+            amount += existingAmount;
+            amount = Math.min(amount, maxLeafLitterAmount);
+        }
+        BlockState litterState = Blocks.LEAF_LITTER.defaultBlockState()
+            .setValue(BlockStateProperties.HORIZONTAL_FACING, dir)
+            .setValue(BlockStateProperties.SEGMENT_AMOUNT, amount);
+        level.setBlock(pos, litterState, 3);
+        return true;
+    }
+
+    // 陰樹として扱う苗木のセットを返す関数
+    public static final boolean isShadeSapling(Block block) {
+        return Set.of(
+            Blocks.JUNGLE_SAPLING,
+            Blocks.SPRUCE_SAPLING,
+            Blocks.DARK_OAK_SAPLING,
+            Blocks.PALE_OAK_SAPLING
+        ).contains(block);
     }
 }
