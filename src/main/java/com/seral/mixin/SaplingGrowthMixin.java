@@ -3,11 +3,13 @@ package com.seral.mixin;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.SaplingBlock;
 import net.minecraft.world.level.block.grower.TreeGrower;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
 
 import org.spongepowered.asm.mixin.Mixin;
@@ -30,11 +32,17 @@ public class SaplingGrowthMixin {
 
         DebugUtils.level = level;
 
-        // 空が見えない場合は枯らす
-        if (!level.canSeeSky(pos.above())) {
+        FluidState fluidState = level.getFluidState(pos);
+        boolean isInWater = fluidState.is(FluidTags.WATER);
+        BlockPos waterSurfacePos = pos.above(calcDistanceToWaterSurface(level, pos));
+
+        // 空が見えない場合は枯らす。水中の場合は水面から水が見えない場合は枯らす
+        if (!isInWater && !level.canSeeSky(pos.above()) || isInWater && !level.canSeeSky(waterSurfacePos.above())) {
             if (!TreeShadeUtils.isShadeSapling(state.getBlock())) { // 陰樹は空が見えなくても枯れにくい
                 level.removeBlock(pos, false);
-                TreeShadeUtils.placeLeafLitterRandomAmount(level, pos);
+                if (!isInWater) { // 水中なら落ち葉を置かない
+                    TreeShadeUtils.placeLeafLitterRandomAmount(level, pos);
+                }
                 ci.cancel();
                 return;
             }
@@ -224,5 +232,17 @@ public class SaplingGrowthMixin {
                 return;
             }
         }
+    }
+
+    // 水中から水面までの距離を計算する
+    private int calcDistanceToWaterSurface(Level level, BlockPos pos) {
+        BlockPos searchPos = pos.mutable();
+        int distance = 0;
+        while (distance < 100 
+            && level.isInsideBuildHeight(searchPos.getY()) 
+            && level.getFluidState(searchPos.above(distance + 1)).is(FluidTags.WATER)) {
+            distance += 1;
+        }
+        return distance;
     }
 }

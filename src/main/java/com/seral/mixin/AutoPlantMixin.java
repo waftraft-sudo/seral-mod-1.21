@@ -11,10 +11,13 @@ import net.minecraft.world.level.block.SaplingBlock;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.tags.BlockTags;
+import net.minecraft.world.item.Items;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.Level;
 
 @Mixin(ItemEntity.class)
@@ -42,37 +45,57 @@ public abstract class AutoPlantMixin {
             return;
         }
         
-        // 地面にある
-        if (!itemEntity.onGround()) {
+        // 5分経過していない
+        if (itemEntity.getAge() < 6000 - 1) { // 5分ちょうどだと設置されないことがある
             return;
         }
         
-        // 5分経過している
-        if (itemEntity.getAge() < 6000 - 1) { // 5分ちょうどだと設置されないことがあるため-1
+        // 地面にある、またはマングローブの苗木で水中にある
+        if (!(itemEntity.onGround() || stack.is(Items.MANGROVE_PROPAGULE) && itemEntity.isInWater())) {
             return;
+        }
+
+        BlockPos originalPos = itemEntity.blockPosition();
+
+        // マングローブの苗木なら水の底まで移動
+        if (stack.is(Items.MANGROVE_PROPAGULE)) {
+            int distance = calcDistanceToWaterBottom(level, originalPos);
+            if (0 < distance) {
+                System.out.println("/tp @s " + itemEntity.getX() + " " + itemEntity.getY() + " " + itemEntity.getZ());
+                itemEntity.setPos(itemEntity.getX(), itemEntity.getY() - distance, itemEntity.getZ());
+                System.out.println("Teleported mangrove sapling");
+                System.out.println("/tp @s " + itemEntity.getX() + " " + (itemEntity.getY()) + " " + itemEntity.getZ());
+            }
         }
 
         BlockPos pos = itemEntity.blockPosition();
         BlockState posState = level.getBlockState(pos);
         BlockState belowState = level.getBlockState(pos.below());
+        BlockState saplingState = blockItem.getBlock().defaultBlockState();
+        FluidState fluidState = level.getFluidState(pos);
 
         // 設置場所が置き換え不可能なら終了
         if (!posState.canBeReplaced()) {
             return;
         }
 
-        // 下がしっかりしたブロックであることを確認
+        // 下がしっかりしたブロックであることを確認。フェンスや屋根の上に落ち葉が落ちないように
         if (!belowState.isFaceSturdy(level, pos.below(), Direction.UP)) {
             return;
         }
         
-        // 空が見えて下が土系のブロックなら苗木を置く
-        if (belowState.is(BlockTags.DIRT) && level.canSeeSky(pos.above())) {
+        // 空が見えて下が植えられるブロックなら苗木を置く
+        if (saplingState.canSurvive(level, pos) 
+            && level.canSeeSky(originalPos.above())) { // 空が見えるか確認するのは水底に沈む前の位置から
             // 苗木を設置
-            level.setBlock(pos, blockItem.getBlock().defaultBlockState(), 3);
+            if (saplingState.hasProperty(BlockStateProperties.WATERLOGGED) && fluidState.is(FluidTags.WATER)) {
+                // waterlog可能で水中ならwaterlog状態で植える
+                saplingState = saplingState.setValue(BlockStateProperties.WATERLOGGED, true);
+            }
+            level.setBlock(pos, saplingState, 3);
         } else {
-            // 落ち葉を置く
-            if (!TreeShadeUtils.tryPlaceLeafLitter(level, pos, 1)) {
+            // 水中でないなら落ち葉を置く
+            if (fluidState.is(FluidTags.WATER) || !TreeShadeUtils.tryPlaceLeafLitter(level, pos, 1)) {
                 return;
             }
         }
@@ -92,6 +115,19 @@ public abstract class AutoPlantMixin {
         ((ItemEntityAccessor) itemEntity).setAge(0);
         itemEntity.setPickUpDelay(0);
     }
+
+    // 水の底までの距離を計算する
+    private int calcDistanceToWaterBottom(Level level, BlockPos pos) {
+        BlockPos searchPos = pos.mutable();
+        int distance = 0;
+        while (distance < 100 
+            && level.isInsideBuildHeight(searchPos.getY()) 
+            && level.getFluidState(searchPos.below(distance + 1)).is(FluidTags.WATER)) {
+            distance += 1;
+        }
+        return distance;
+    }
+
 }
 
 
