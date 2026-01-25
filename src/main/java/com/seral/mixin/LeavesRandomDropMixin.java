@@ -48,7 +48,6 @@ public class LeavesRandomDropMixin {
             // 3. ドロップ品の中から「苗木」だけを探して落とす
             for (ItemStack stack : drops) {
                 if (stack.is(ItemTags.SAPLINGS)) {
-                    System.out.println("dropping a sapling");
                     
                     // 苗木が見つかったらスポーンさせる
                     ItemEntity itemEntity = new ItemEntity(level, 
