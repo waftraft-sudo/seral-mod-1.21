@@ -73,7 +73,7 @@ public class SaplingGrowthMixin {
                 ci.cancel();
                 return;
             }
-            if (random.nextFloat() < 0.1f) {
+            if (random.nextFloat() < 0.5f) {
                 return; // 陰樹は成長しにくい
             }
         }
@@ -103,21 +103,6 @@ public class SaplingGrowthMixin {
         // }
     }
 
-    @Inject(method = "randomTick", at = @At("HEAD"))
-    private void onRandomTickCheckDark(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
-
-        DebugUtils.level = level;
-
-        // 暗い場所ではadvanceTreeが起きないため苗木が残る問題に対処する
-
-        if (!level.canSeeSky(pos.above())) {
-            level.removeBlock(pos, false);
-            TreeShadeUtils.placeLeafLitterRandomAmount(level, pos);
-            return;
-        }
-
-    }
-
     // 周囲に苗木が多かったらもう一つ苗木を増やす
     private boolean tryPlantAnother(ServerLevel level, BlockPos pos) {
         Block saplingBlock = level.getBlockState(pos).getBlock();
@@ -140,8 +125,6 @@ public class SaplingGrowthMixin {
         }
         if (maxFitness == 0) {
             if (random.nextFloat() < 0.1f) {
-                System.out.println("Removing isolated sapling at " + pos);
-                System.out.println("/tp @s " + pos.getX() + " " + (pos.getY()+1) + " " + pos.getZ());
                 level.removeBlock(pos, false);
                 TreeShadeUtils.placeLeafLitterRandomAmount(level, pos);
                 // 2x2になれないなら消える
@@ -169,33 +152,6 @@ public class SaplingGrowthMixin {
         return false;
     }
 
-    // advanceTree の中で呼ばれる treeGrower.grow の結果を横取りする
-    @Redirect(
-        method = "advanceTree",
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/world/level/block/grower/TreeGrower;growTree(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/level/chunk/ChunkGenerator;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/util/RandomSource;)Z"
-        )
-    )
-    private boolean captureGrowResult(TreeGrower grower, ServerLevel level, ChunkGenerator generator, BlockPos pos, BlockState state, RandomSource random) {
-        // 本来の処理を実行して結果(boolean)を受け取る
-        boolean success = grower.growTree(level, generator, pos, state, random);
-
-        // 陰樹のときのみログを出す
-        if (TreeShadeUtils.isShadeSapling(state.getBlock())) {
-            if (success) {
-                // ★ここに成功時の独自処理を書ける
-                // 例: level.playSound(null, pos, SoundEvents.ENTITY_PLAYER_LEVELUP, SoundCategory.BLOCKS, 1.0f, 1.0f);
-                // System.out.println("Mixin: Successfully generated tree at " + pos);
-                // System.out.println("/tp " + pos.getX() + " " + (pos.getY()+1) + " " + pos.getZ());
-            }
-            
-        }
-
-        // 本来の戻り値を返す（これを返さないとロジックが壊れる）
-        return success;
-    }
-
     private int getTwoByTwoFitness(Level level, BlockPos pos, Block block) {
         int fitness = 0;
         for (int dx = 0; dx <= 1; dx++) {
@@ -221,6 +177,7 @@ public class SaplingGrowthMixin {
         return fitness;
     }
 
+    // 2x2になるように苗木を一つ増やす
     private void plantAnother(Level level, BlockPos pos, Block block) {
         for (int dx = 0; dx <= 1; dx++) {
             for (int dz = 0; dz <= 1; dz++) {

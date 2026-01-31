@@ -17,6 +17,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import com.seral.util.BiomeUtils;
+
 import java.util.List;
 
 @Mixin(LeavesBlock.class)
@@ -33,8 +35,13 @@ public class LeavesRandomDropMixin {
 
     @Inject(method = "randomTick", at = @At("TAIL"))
     private void onRandomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
-        // 例: 0.1%の確率で「ドロップ判定」を行う
-        if (!state.getValue(LeavesBlock.PERSISTENT) && random.nextFloat() < 0.0076f) {
+
+        // 湿度（0：乾燥～4：湿潤）
+        int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
+
+        // 確率で「ドロップ判定」を行う
+        if (!state.getValue(LeavesBlock.PERSISTENT) 
+            && random.nextFloat() < 0.0001f * (vegetationIndex + 1)) { // 多湿なほど葉っぱから苗木が出やすい
             
             // 1. ルートテーブルを引くための「状況（Context）」を作成
             // 「素手（ItemStack.EMPTY）で、その場所にあるブロックを壊した」という状況をシミュレート

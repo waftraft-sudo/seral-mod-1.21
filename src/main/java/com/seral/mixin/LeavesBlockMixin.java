@@ -4,8 +4,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -14,6 +16,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import com.seral.util.LeafUtils;
 import com.seral.util.TreeShadeUtils;
 import com.seral.util.TreeStructure;
+import com.seral.util.BiomeUtils;
 import com.seral.util.DebugUtils;
 
 import org.spongepowered.asm.mixin.Mixin;
@@ -59,20 +62,24 @@ public class LeavesBlockMixin {
 
         TreeStructure tree = identifyWholeTree(level, startLogPos);
 
+        // 湿度に応じて確立で枯れる
+        // 湿度（0：乾燥～4：湿潤）
+        int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
+
         // ランダムで倒す
-        if (1.0f / tree.logPositions.size() < random.nextFloat()) { // 大きな木は倒れにくくする
+        if (10.0f / tree.logPositions.size() / (vegetationIndex + 1) < random.nextFloat()) {// 大きいほど、湿度が高いほど倒れにくい
             return;
         }
 
-        if (random.nextFloat() < 0.005f) {
+        if (random.nextFloat() < 0.05f) {
             System.out.println("Randomly knocking down tree at " + startLogPos);
             knockDownTree(level, tree);
             return;
         }
 
         // 日陰判定
-        if (isInShade(level, tree.highestLogPos, 8)) {
-            if (!TreeShadeUtils.isShadeSapling(LeafUtils.getSapling(level.getBlockState(pos).getBlock())) || random.nextFloat() < 0.1) { // 陰樹は日陰でも倒れにくい
+        if (isInShade(level, tree.highestLogPos, 4)) {
+            if (!TreeShadeUtils.isShadeSapling(LeafUtils.getSapling(level.getBlockState(pos).getBlock())) || random.nextFloat() < 0.5) { // 陰樹は日陰でも倒れにくい
                 System.out.println("Knocking down tree at " + startLogPos + " due to shade.");
                 knockDownTree(level, tree);
                 return;
@@ -115,12 +122,9 @@ public class LeavesBlockMixin {
 
     // ほかの木によって日陰になっているかどうかの判定を行うヘルパーメソッド
     // 上向きピラミッドの指定範囲内に葉ブロックが存在するかをチェックする
-    private static boolean isInShade(ServerLevel level, BlockPos pos, int checks) {
+    private static boolean isInShade(ServerLevel level, BlockPos pos, int radius) {
 
         DebugUtils.level = level;
-
-        DebugUtils.p(pos, 5000, "Started check for shade.");
-        DebugUtils.p(pos, 5000, "/tp @s " + pos.getX() + " " + pos.getY() + " " + pos.getZ());
 
         // 自分の葉
         BlockPos thisLeafPos = pos.above();
@@ -133,25 +137,26 @@ public class LeavesBlockMixin {
 
         // 自分の葉から上に進み、最初の自分と同じ葉以外のブロックを探す
         BlockPos abovePos = thisLeafPos;
-        for (int i = 0; i < 4; i++) { // 最初の葉の三つ上の葉まで自分の葉とみなす
+        for (int i = 0; i < 4; i++) { // 最初の葉の4つ上の葉まで自分の葉とみなす
             abovePos = thisLeafPos.above(i + 1);
             BlockState aboveState = level.getBlockState(abovePos);
             if (aboveState.getBlock() != thisLeaf) {
-                DebugUtils.p(abovePos, 5000, "Found some block other than my leaf.");
-                DebugUtils.p(abovePos, 5000, "/tp @s " + abovePos.getX() + " " + abovePos.getY() + " " + abovePos.getZ());
                 break;
             }
         }
-        
-        // 自分の葉以外のブロックの5個下のブロックを起点に上向きのピラミッド型のエリアをチェック
-        // ただし、葉より上のブロックしかチェックしない
-        BlockPos pyramidStartPos = abovePos.below(5);
-        return TreeShadeUtils.checkAboveBlocks(level, pyramidStartPos, 6, 10, checks, 
-            (checkPos) -> {
-                BlockState state = level.getBlockState(checkPos);
-                return state.is(BlockTags.LEAVES);
+
+        // 特定の範囲の明るさの平均値をとる
+        double sum = 0.0f;
+        for (int i = -radius; i < radius + 1; i++) {
+            for (int j = -radius; j < radius + 1; j++) {
+                BlockPos lightPos = abovePos.offset(i, 0, j);
+                sum += level.getBrightness(LightLayer.SKY, lightPos);
             }
-        );
+        }
+        double averageBrightness = sum / ((2 * radius + 1) * (2 * radius + 1));
+        // System.out.println("Brightness: " + averageBrightness);
+
+        return averageBrightness < 14.5f;
     }
 
     // 木を倒す

@@ -5,6 +5,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import com.seral.util.BiomeUtils;
 import com.seral.util.TreeShadeUtils;
 
 import net.minecraft.world.level.block.SaplingBlock;
@@ -13,8 +14,10 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.util.RandomSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.material.FluidState;
@@ -28,12 +31,13 @@ public abstract class AutoPlantMixin {
         // Mixinの対象である ItemEntity 自身を取得
         ItemEntity itemEntity = (ItemEntity) (Object) this;
         ItemStack stack = itemEntity.getItem();
-        Level level = itemEntity.level();
 
         // サーバーサイドでのみ処理（クライアント側での二重設置を防ぐ）
-        if (level.isClientSide()) {
+        Level itemLevel = itemEntity.level();
+        if (itemLevel.isClientSide()) {
             return;
         }
+        ServerLevel level = (ServerLevel) itemLevel;
 
         // アイテムが「ブロック」
         if (!(stack.getItem() instanceof BlockItem blockItem)) {
@@ -82,6 +86,18 @@ public abstract class AutoPlantMixin {
         // 下がしっかりしたブロックであることを確認。フェンスや屋根の上に落ち葉が落ちないように
         if (!belowState.isFaceSturdy(level, pos.below(), Direction.UP)) {
             return;
+        }
+
+        RandomSource random = level.random;
+
+        // 湿度に応じて確立で枯れる
+        // 湿度（0：乾燥～4：湿潤）
+        int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
+        if (0.2 * (vegetationIndex + 1) < random.nextFloat()) { // 湿度が低いほど枯れやすい
+            // 水中でないなら落ち葉を置く
+            if (fluidState.is(FluidTags.WATER) || !TreeShadeUtils.tryPlaceLeafLitter(level, pos, 1)) {
+                return;
+            }
         }
         
         // 空が見えて下が植えられるブロックなら苗木を置く
