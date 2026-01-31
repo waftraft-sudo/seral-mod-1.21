@@ -72,10 +72,7 @@ public final class TreeShadeUtils {
         tryPlaceLeafLitter(level, pos, amount);
     }
 
-    public static boolean tryPlaceLeafLitter(Level level, BlockPos pos, int amount) {        
-
-        // System.out.println("Placing leaf litter at " + pos + " in temperature " + BiomeUtils.getRawTemperature((ServerLevel) level, pos));
-        // System.out.println("/tp @s " + pos.getX() + " " + pos.getY() + " " + pos.getZ());
+    public static boolean tryPlaceLeafLitter(Level level, BlockPos pos, int amount) {
 
         BlockState posState = level.getBlockState(pos);
         Direction dir = Direction.Plane.HORIZONTAL.getRandomDirection(level.random);
@@ -98,11 +95,12 @@ public final class TreeShadeUtils {
 
     // 陰樹として扱う苗木のセットを返す関数
     public static final boolean isShadeSapling(Block block) {
-        return Set.of(
+        Set<Block> shadeSaplings = Set.of(
             Blocks.JUNGLE_SAPLING,
             Blocks.SPRUCE_SAPLING,
             Blocks.DARK_OAK_SAPLING,
             Blocks.PALE_OAK_SAPLING
-        ).contains(block);
+        );
+        return shadeSaplings.contains(block);
     }
 }

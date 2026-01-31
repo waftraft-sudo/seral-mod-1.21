@@ -63,12 +63,9 @@ public abstract class AutoPlantMixin {
 
         // マングローブの苗木なら水の底まで移動
         if (stack.is(Items.MANGROVE_PROPAGULE)) {
-            int distance = calcDistanceToWaterBottom(level, originalPos);
-            if (0 < distance) {
-                System.out.println("/tp @s " + itemEntity.getX() + " " + itemEntity.getY() + " " + itemEntity.getZ());
+            int distance = calcDistanceToWaterBottom(level, originalPos, 10);
+            if (0 < distance && distance < 10) {
                 itemEntity.setPos(itemEntity.getX(), itemEntity.getY() - distance, itemEntity.getZ());
-                System.out.println("Teleported mangrove sapling");
-                System.out.println("/tp @s " + itemEntity.getX() + " " + (itemEntity.getY()) + " " + itemEntity.getZ());
             }
         }
 
@@ -133,10 +130,10 @@ public abstract class AutoPlantMixin {
     }
 
     // 水の底までの距離を計算する
-    private int calcDistanceToWaterBottom(Level level, BlockPos pos) {
+    private int calcDistanceToWaterBottom(Level level, BlockPos pos, int limit) {
         BlockPos searchPos = pos.mutable();
         int distance = 0;
-        while (distance < 100 
+        while (distance < limit
             && level.isInsideBuildHeight(searchPos.getY()) 
             && level.getFluidState(searchPos.below(distance + 1)).is(FluidTags.WATER)) {
             distance += 1;

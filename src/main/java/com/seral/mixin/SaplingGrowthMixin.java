@@ -1,28 +1,31 @@
 package com.seral.mixin;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.SaplingBlock;
-import net.minecraft.world.level.block.grower.TreeGrower;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import com.seral.util.DebugUtils;
+import com.seral.util.SaplingWitherUtil;
 import com.seral.util.TreeShadeUtils;
 
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 
 @Mixin(SaplingBlock.class)
 public class SaplingGrowthMixin {
@@ -39,10 +42,7 @@ public class SaplingGrowthMixin {
         // 空が見えない場合は枯らす。水中の場合は水面から水が見えない場合は枯らす
         if (!isInWater && !level.canSeeSky(pos.above()) || isInWater && !level.canSeeSky(waterSurfacePos.above())) {
             if (!TreeShadeUtils.isShadeSapling(state.getBlock())) { // 陰樹は空が見えなくても枯れにくい
-                level.removeBlock(pos, false);
-                if (!isInWater) { // 水中なら落ち葉を置かない
-                    TreeShadeUtils.placeLeafLitterRandomAmount(level, pos);
-                }
+                SaplingWitherUtil.witherSapling(level, pos);
                 ci.cancel();
                 return;
             }
@@ -50,10 +50,9 @@ public class SaplingGrowthMixin {
 
         // 周りに木がある場合は枯らす
         boolean hasNearbyTrees = false;
-        int checkRange = TreeShadeUtils.isShadeSapling(state.getBlock()) ? 1 : 12; // 陰樹なら近くの木しかチェックしない
-        for (int i = 0; i < 8; i++) {
+        int checkRange = TreeShadeUtils.isShadeSapling(state.getBlock()) ? 4 : 12; // 陰樹なら近くの木しかチェックしない
+        for (int i = 0; i < 16; i++) {
             Vec3 offset = TreeShadeUtils.generatePyramidOffsetOutline(level.getRandom(), 1, checkRange);
-            // System.out.println(offset);
             BlockPos checkPos = pos.offset((int)Math.round(offset.x), (int)Math.round(offset.y), (int)Math.round(offset.z));
             if (level.getBlockState(checkPos).is(BlockTags.LEAVES)) {
                 hasNearbyTrees = true;
@@ -61,49 +60,41 @@ public class SaplingGrowthMixin {
             }
         }
         if (hasNearbyTrees) {
-            DebugUtils.p(pos, 5, "Sapling getting removed due to nearby trees at " + pos);
             level.removeBlock(pos, false);
-            TreeShadeUtils.placeLeafLitterRandomAmount(level, pos);
+            SaplingWitherUtil.witherSapling(level, pos);
             ci.cancel();
             return;
         }
 
         if (TreeShadeUtils.isShadeSapling(state.getBlock())) {
-            if (tryPlantAnother(level, pos)) {
+            if (random.nextFloat() < 0.5f && tryPlantAnother(level, pos)) {
                 ci.cancel();
                 return;
             }
-            if (random.nextFloat() < 0.5f) {
-                return; // 陰樹は成長しにくい
-            }
         }
 
-        // // System.out.println("Sapling at " + pos + " has sky access with sky light level: " + skyLight);
-
-        // // 3. 巨木（2x2）の判定を邪魔しないように、今の場所が1本の時だけ実行
-        // // (簡易的な判定：隣が苗木でなければ1本とみなす)
-        // if (!isLargeSaplingSetup(level, pos, state)) {
+        // ジャングルの苗木なら確率でjungle bushになる
+        if (state.is(Blocks.JUNGLE_SAPLING) && random.nextFloat() < 0.1f) {
             
-        //     // 明るさに応じて設定を選択
-        //     ResourceKey<ConfiguredFeature<?, ?>> selectedKey = (skyLight > 13) ? TALL_OAK : SHORT_OAK;
-        //     if (skyLight == 15 && random.nextFloat() < 0.1F) {
-        //         selectedKey = FANCY_OAK;
-        //     }
+            ResourceKey<ConfiguredFeature<?, ?>> featureKey = 
+                ResourceKey.create(Registries.CONFIGURED_FEATURE, Identifier.tryParse("minecraft:jungle_bush"));
 
-        //     // レジストリから設定を取得して木を生成
-        //     level.registryAccess().lookupOrThrow(Registries.CONFIGURED_FEATURE)
-        //         .get(selectedKey)
-        //         .ifPresent(feature -> {
-        //             // 苗木を消して木を置く
-        //             level.removeBlock(pos, false);
-        //             if (feature.value().place(level, level.getChunkSource().getGenerator(), random, pos)) {
-        //                 ci.cancel(); // バニラの成長処理を中止
-        //             }
-        //         });
-        // }
+            // レジストリから設定を取得して木を生成
+            level.registryAccess().lookupOrThrow(Registries.CONFIGURED_FEATURE)
+                .get(featureKey)
+                .ifPresent(feature -> {
+                    // 苗木を消して木を置く
+                    level.removeBlock(pos, false);
+                    if (feature.value().place(level, level.getChunkSource().getGenerator(), random, pos)) {
+                        ci.cancel(); // バニラの成長処理を中止
+                        return;
+                    }
+                }
+            );
+        }
     }
 
-    // 周囲に苗木が多かったらもう一つ苗木を増やす
+    // 周囲に自分と同じ苗木が多かったらもう一つ苗木を増やす
     private boolean tryPlantAnother(ServerLevel level, BlockPos pos) {
         Block saplingBlock = level.getBlockState(pos).getBlock();
         RandomSource random = level.getRandom();
@@ -127,10 +118,11 @@ public class SaplingGrowthMixin {
             if (random.nextFloat() < 0.1f) {
                 level.removeBlock(pos, false);
                 TreeShadeUtils.placeLeafLitterRandomAmount(level, pos);
-                // 2x2になれないなら消える
+                // 2x2になれないなら確率で消える
             }
             return false;
         }
+
         if (maxFitness == 1) {
             return false;
         }
@@ -143,8 +135,6 @@ public class SaplingGrowthMixin {
                     continue;
                 }
 
-                // System.out.println("Auto-planting additional sapling from " + pos);
-                // System.out.println("/tp @s " + pos.getX() + " " + pos.getY() + " " + pos.getZ());
                 plantAnother(level, pos.offset(i, 0, j), saplingBlock);
                 return true;
             }
@@ -193,11 +183,12 @@ public class SaplingGrowthMixin {
 
     // 水中から水面までの距離を計算する
     private int calcDistanceToWaterSurface(Level level, BlockPos pos) {
-        BlockPos searchPos = pos.mutable();
+        BlockPos.MutableBlockPos cursor = pos.mutable().move(0, 1, 0);
         int distance = 0;
         while (distance < 100 
-            && level.isInsideBuildHeight(searchPos.getY()) 
-            && level.getFluidState(searchPos.above(distance + 1)).is(FluidTags.WATER)) {
+            && level.isInsideBuildHeight(cursor.getY()) 
+            && level.getFluidState(cursor).is(FluidTags.WATER)) {
+            cursor.move(0, 1, 0);
             distance += 1;
         }
         return distance;

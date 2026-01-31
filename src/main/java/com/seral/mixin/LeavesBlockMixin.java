@@ -4,7 +4,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.LightLayer;
@@ -67,11 +66,11 @@ public class LeavesBlockMixin {
         int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
 
         // ランダムで倒す
-        if (10.0f / tree.logPositions.size() / (vegetationIndex + 1) < random.nextFloat()) {// 大きいほど、湿度が高いほど倒れにくい
+        if (1.0f / tree.logPositions.size() / (vegetationIndex + 1) < random.nextFloat()) {// 大きいほど、湿度が高いほど倒れにくい
             return;
         }
 
-        if (random.nextFloat() < 0.05f) {
+        if (random.nextFloat() < 0.1f) {
             System.out.println("Randomly knocking down tree at " + startLogPos);
             knockDownTree(level, tree);
             return;
@@ -79,7 +78,8 @@ public class LeavesBlockMixin {
 
         // 日陰判定
         if (isInShade(level, tree.highestLogPos, 4)) {
-            if (!TreeShadeUtils.isShadeSapling(LeafUtils.getSapling(level.getBlockState(pos).getBlock())) || random.nextFloat() < 0.5) { // 陰樹は日陰でも倒れにくい
+            Block saplingBlock = LeafUtils.getSapling(level.getBlockState(pos).getBlock());
+            if (!TreeShadeUtils.isShadeSapling(saplingBlock) || random.nextFloat() < 0.01) { // 陰樹は日陰でも倒れにくい
                 System.out.println("Knocking down tree at " + startLogPos + " due to shade.");
                 knockDownTree(level, tree);
                 return;
@@ -132,7 +132,7 @@ public class LeavesBlockMixin {
         Block thisLeaf = thisLeafState.getBlock();
 
         if (!thisLeafState.is(BlockTags.LEAVES)) {
-            return false; // 何らかの理由でログの真上のブロックが葉ではないならば日陰ではないとみなす
+            return true; // 何らかの理由でログの真上のブロックが葉ではないならば日陰とみなす
         }
 
         // 自分の葉から上に進み、最初の自分と同じ葉以外のブロックを探す
@@ -147,13 +147,19 @@ public class LeavesBlockMixin {
 
         // 特定の範囲の明るさの平均値をとる
         double sum = 0.0f;
+        int count = 0;
         for (int i = -radius; i < radius + 1; i++) {
             for (int j = -radius; j < radius + 1; j++) {
                 BlockPos lightPos = abovePos.offset(i, 0, j);
+                int brightness = level.getBrightness(LightLayer.SKY, lightPos);
+                if (brightness == 0) {
+                    continue;
+                }
                 sum += level.getBrightness(LightLayer.SKY, lightPos);
+                count += 1;
             }
         }
-        double averageBrightness = sum / ((2 * radius + 1) * (2 * radius + 1));
+        double averageBrightness = sum / count;
         // System.out.println("Brightness: " + averageBrightness);
 
         return averageBrightness < 14.5f;

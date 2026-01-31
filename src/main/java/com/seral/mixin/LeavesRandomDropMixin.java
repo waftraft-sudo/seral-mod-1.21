@@ -4,7 +4,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -18,6 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.seral.util.BiomeUtils;
+import com.seral.util.SaplingDropUtil;
 
 import java.util.List;
 
@@ -41,7 +41,7 @@ public class LeavesRandomDropMixin {
 
         // 確率で「ドロップ判定」を行う
         if (!state.getValue(LeavesBlock.PERSISTENT) 
-            && random.nextFloat() < 0.0001f * (vegetationIndex + 1)) { // 多湿なほど葉っぱから苗木が出やすい
+            && random.nextFloat() < 0.001f * (vegetationIndex + 1)) { // 多湿なほど葉っぱから苗木が出やすい
             
             // 1. ルートテーブルを引くための「状況（Context）」を作成
             // 「素手（ItemStack.EMPTY）で、その場所にあるブロックを壊した」という状況をシミュレート
@@ -55,21 +55,7 @@ public class LeavesRandomDropMixin {
             // 3. ドロップ品の中から「苗木」だけを探して落とす
             for (ItemStack stack : drops) {
                 if (stack.is(ItemTags.SAPLINGS)) {
-                    
-                    // 苗木が見つかったらスポーンさせる
-                    ItemEntity itemEntity = new ItemEntity(level, 
-                        pos.getX() + 0.5, pos.getY() - 0.5, pos.getZ() + 0.5, 
-                        stack.copy()
-                    );
-                    
-                    // ランダムな方向に飛ばす
-                    // random.nextGaussian() を使うと、自然なバラつきになる
-                    double dx = random.nextGaussian() * 1.0; // X方向の速度
-                    double dy = 0.01;                        // Y方向（少し上に跳ねさせる）
-                    double dz = random.nextGaussian() * 1.0; // Z方向の速度
-
-                    itemEntity.setDeltaMovement(dx, dy, dz);
-                    level.addFreshEntity(itemEntity);
+                    SaplingDropUtil.popSapling(level, pos, stack.copy());
                 }
             }
         }
