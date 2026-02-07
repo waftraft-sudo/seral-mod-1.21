@@ -30,6 +30,11 @@ public class TreeFallMixin {
     @Inject(method = "randomTick", at = @At("HEAD"), cancellable = true)
     public void onRandomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
 
+        // ベースの確率
+        if (random.nextFloat() < 0.8f) {
+            return;
+        }
+
         DebugUtils.level = level;
 
         // プレイヤー建築保護
@@ -40,7 +45,7 @@ public class TreeFallMixin {
         // 湿度（0：乾燥～4：湿潤）
         int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
         // 湿度が高いほど倒れにくい
-        if (1.0f / (vegetationIndex + 2) < random.nextFloat()) {
+        if (1.0f / (vegetationIndex + 1.0f) < random.nextFloat()) {
             return;
         }
 
@@ -53,12 +58,15 @@ public class TreeFallMixin {
 
         TreeStructure tree = identifyWholeTree(level, startLogPos);
 
-        if (1.0f / tree.logPositions.size() < random.nextFloat()) { // 大きいほど倒れにくい
-            return;
+        // 頂点が2x2の木は1ブロックの木と比べて4倍の確率で倒木判定が起きるため4分の1にする
+        if (tree.has2x2Peak) {
+            if (1.0f / 4.0f < random.nextFloat()) {
+                return;
+            }
         }
 
-        if (random.nextFloat() < 0.03f) {
-            DebugUtils.p(startLogPos, 10, "Randomly knocking down tree at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
+        if (random.nextFloat() < 0.05f) {
+            DebugUtils.p(startLogPos, 50, "Randomly knocking down tree at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
             knockDownTree(level, tree);
             return;
         }
@@ -67,7 +75,7 @@ public class TreeFallMixin {
         if (isInShade(level, tree.highestLogPos, 4)) {
             Block saplingBlock = LeafUtils.getSapling(level.getBlockState(pos).getBlock());
             if (!TreeShadeUtils.isShadeSapling(saplingBlock) || random.nextFloat() < 0.01) { // 陰樹は日陰でも倒れにくい
-                DebugUtils.p(startLogPos, 10, "Knocking down tree due to shade at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
+                DebugUtils.p(startLogPos, 50, "Knocking down tree due to shade at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
                 knockDownTree(level, tree);
                 return;
             }
@@ -224,10 +232,16 @@ public class TreeFallMixin {
             }
         }
 
+        BlockPos finalHighestLogPos = highestPos;
+        boolean has2x2Peak = logsToRemove.stream().filter(logPos -> 
+            !finalHighestLogPos.equals(logPos) && finalHighestLogPos.getY() == logPos.getY()
+        ).findAny().isPresent();
+
         TreeStructure tree = new TreeStructure();
         tree.logPositions = logsToRemove;
         tree.lowestLogPos = lowestPos;
         tree.highestLogPos = highestPos;
+        tree.has2x2Peak = has2x2Peak;
         return tree;
     }
 }

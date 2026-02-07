@@ -41,7 +41,7 @@ public class SaplingGrowthMixin {
 
         // 空が見えない場合は枯らす。水中の場合は水面から水が見えない場合は枯らす
         if (!isInWater && !level.canSeeSky(pos.above()) || isInWater && !level.canSeeSky(waterSurfacePos.above())) {
-            if (!TreeShadeUtils.isShadeSapling(state.getBlock())) { // 陰樹は空が見えなくても枯れにくい
+            if (!TreeShadeUtils.isShadeSapling(state.getBlock()) || random.nextFloat() < 0.1f) { // 陰樹は空が見えなくても枯れにくい
                 SaplingWitherUtil.witherSapling(level, pos);
                 ci.cancel();
                 return;
@@ -52,7 +52,7 @@ public class SaplingGrowthMixin {
         boolean hasNearbyTrees = false;
         int checkRange = TreeShadeUtils.isShadeSapling(state.getBlock()) ? 1 : 12; // 陰樹なら近くの木しかチェックしない
         for (int i = 0; i < 16; i++) {
-            Vec3 offset = TreeShadeUtils.generatePyramidOffsetOutline(level.getRandom(), 1, checkRange);
+            Vec3 offset = TreeShadeUtils.generatePyramidOffsetOutline(random, 1, checkRange);
             BlockPos checkPos = pos.offset((int)Math.round(offset.x), (int)Math.round(offset.y), (int)Math.round(offset.z));
             if (level.getBlockState(checkPos).is(BlockTags.LEAVES)) {
                 hasNearbyTrees = true;
@@ -71,10 +71,14 @@ public class SaplingGrowthMixin {
                 ci.cancel();
                 return;
             }
+            if (random.nextFloat() < 0.2f) {
+                ci.cancel();
+                return;
+            }
         }
 
         // ジャングルの苗木なら確率でjungle bushになる
-        if (state.is(Blocks.JUNGLE_SAPLING) && random.nextFloat() < 0.1f) {
+        if (state.is(Blocks.JUNGLE_SAPLING) && random.nextFloat() < 0.01f) {
             
             ResourceKey<ConfiguredFeature<?, ?>> featureKey = 
                 ResourceKey.create(Registries.CONFIGURED_FEATURE, Identifier.tryParse("minecraft:jungle_bush"));
@@ -143,6 +147,7 @@ public class SaplingGrowthMixin {
     }
 
     private int getTwoByTwoFitness(Level level, BlockPos pos, Block block) {
+        BlockState saplingState = block.defaultBlockState();
         int fitness = 0;
         for (int dx = 0; dx <= 1; dx++) {
             for (int dz = 0; dz <= 1; dz++) {
@@ -153,13 +158,15 @@ public class SaplingGrowthMixin {
                     continue;
                 }
 
-                // 設置場所が置き換え不可能なら終了
+                if (!level.canSeeSky(checkPos.above())) {
+                    return 0;
+                }
+
                 if (!(level.getBlockState(checkPos).canBeReplaced())) {
                     return 0;
                 }
                 
-                // 下が土系のブロックでないなら終了
-                if (!level.getBlockState(checkPos.below()).is(BlockTags.DIRT)) {
+                if (!saplingState.canSurvive(level, checkPos)) {
                     return 0;
                 }
             }

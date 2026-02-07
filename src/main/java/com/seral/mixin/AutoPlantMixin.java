@@ -95,20 +95,18 @@ public abstract class AutoPlantMixin {
         if (!belowState.isFaceSturdy(level, pos.below(), Direction.UP)) {
             return;
         }
-
-        // 陰樹はPotzol以外では植わりにくい
-        if (TreeShadeUtils.isShadeSapling(block) && random.nextFloat() < 0.2f) {
-            if (!belowState.is(Blocks.PODZOL)) {
-                SaplingWitherUtil.witherItemSapling(level, originalPos);
-                return;
-            }
-        }
-
+        
         // Podzol以外では湿度に応じて確率で枯れる
         // 湿度（0：乾燥～4：湿潤）{
         if (!belowState.is(Blocks.PODZOL)) {
+            // 陰樹はPotzol以外では植わりにくい
+            if (TreeShadeUtils.isShadeSapling(block) && random.nextFloat() < 0.2f) {
+                SaplingWitherUtil.witherItemSapling(level, pos);
+                return;
+            }
             int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
-            if (0.1 * (vegetationIndex + 1) < random.nextFloat()) { // 湿度が低いほど枯れやすい
+            if (0.02 * (vegetationIndex + 1) * (vegetationIndex + 1) < random.nextFloat()) { // 湿度が低いほど枯れやすい
+                DebugUtils.p(pos, 50, "withering with vegetation index: " + vegetationIndex);
                 SaplingWitherUtil.witherItemSapling(level, pos);
                 return;
             }
