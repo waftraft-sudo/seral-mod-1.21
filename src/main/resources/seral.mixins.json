@@ -5,7 +5,7 @@
 	"mixins": [
 		"AutoPlantMixin",
 		"LeavesRandomDropMixin",
-		"LeavesBlockMixin",
+		"TreeFallMixin",
 		"SaplingGrowthMixin",
 		"ItemEntityAccessor",
 		"MangrovePropaguleDropMixin"

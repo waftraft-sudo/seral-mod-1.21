@@ -41,7 +41,7 @@ public class LeavesRandomDropMixin {
 
         // 確率で「ドロップ判定」を行う
         if (!state.getValue(LeavesBlock.PERSISTENT) 
-            && random.nextFloat() < 0.001f * (vegetationIndex + 1)) { // 多湿なほど葉っぱから苗木が出やすい
+            && random.nextFloat() < 0.003f * (vegetationIndex + 1)) { // 多湿なほど葉っぱから苗木が出やすい
             
             // 1. ルートテーブルを引くための「状況（Context）」を作成
             // 「素手（ItemStack.EMPTY）で、その場所にあるブロックを壊した」という状況をシミュレート

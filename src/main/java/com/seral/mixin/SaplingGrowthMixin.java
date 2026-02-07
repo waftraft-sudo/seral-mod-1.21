@@ -50,7 +50,7 @@ public class SaplingGrowthMixin {
 
         // 周りに木がある場合は枯らす
         boolean hasNearbyTrees = false;
-        int checkRange = TreeShadeUtils.isShadeSapling(state.getBlock()) ? 4 : 12; // 陰樹なら近くの木しかチェックしない
+        int checkRange = TreeShadeUtils.isShadeSapling(state.getBlock()) ? 1 : 12; // 陰樹なら近くの木しかチェックしない
         for (int i = 0; i < 16; i++) {
             Vec3 offset = TreeShadeUtils.generatePyramidOffsetOutline(level.getRandom(), 1, checkRange);
             BlockPos checkPos = pos.offset((int)Math.round(offset.x), (int)Math.round(offset.y), (int)Math.round(offset.z));

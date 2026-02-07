@@ -6,18 +6,22 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import com.seral.util.BiomeUtils;
+import com.seral.util.DebugUtils;
+import com.seral.util.SaplingWitherUtil;
 import com.seral.util.TreeShadeUtils;
 
-import net.minecraft.world.level.block.SaplingBlock;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.material.FluidState;
@@ -28,6 +32,8 @@ public abstract class AutoPlantMixin {
 
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
+
+
         // Mixinの対象である ItemEntity 自身を取得
         ItemEntity itemEntity = (ItemEntity) (Object) this;
         ItemStack stack = itemEntity.getItem();
@@ -39,17 +45,23 @@ public abstract class AutoPlantMixin {
         }
         ServerLevel level = (ServerLevel) itemLevel;
 
+        RandomSource random = level.random;
+        
+        DebugUtils.level = level;
+
+        BlockPos originalPos = itemEntity.blockPosition();
+
         // アイテムが「ブロック」
         if (!(stack.getItem() instanceof BlockItem blockItem)) {
             return;
         }
 
         // アイテムが「苗木」
-        if (!(blockItem.getBlock() instanceof SaplingBlock)) {
+        if (!(stack.is(ItemTags.SAPLINGS))) {
             return;
         }
         
-        // 5分経過していない
+        // 5分経過
         if (itemEntity.getAge() < 6000 - 1) { // 5分ちょうどだと設置されないことがある
             return;
         }
@@ -59,12 +71,10 @@ public abstract class AutoPlantMixin {
             return;
         }
 
-        BlockPos originalPos = itemEntity.blockPosition();
-
         // マングローブの苗木なら水の底まで移動
         if (stack.is(Items.MANGROVE_PROPAGULE)) {
             int distance = calcDistanceToWaterBottom(level, originalPos, 10);
-            if (0 < distance && distance < 10) {
+            if (0 < distance && distance < 5) {
                 itemEntity.setPos(itemEntity.getX(), itemEntity.getY() - distance, itemEntity.getZ());
             }
         }
@@ -74,6 +84,7 @@ public abstract class AutoPlantMixin {
         BlockState belowState = level.getBlockState(pos.below());
         BlockState saplingState = blockItem.getBlock().defaultBlockState();
         FluidState fluidState = level.getFluidState(pos);
+        Block block = blockItem.getBlock();
 
         // 設置場所が置き換え不可能なら終了
         if (!posState.canBeReplaced()) {
@@ -85,14 +96,20 @@ public abstract class AutoPlantMixin {
             return;
         }
 
-        RandomSource random = level.random;
+        // 陰樹はPotzol以外では植わりにくい
+        if (TreeShadeUtils.isShadeSapling(block) && random.nextFloat() < 0.2f) {
+            if (!belowState.is(Blocks.PODZOL)) {
+                SaplingWitherUtil.witherItemSapling(level, originalPos);
+                return;
+            }
+        }
 
-        // 湿度に応じて確立で枯れる
-        // 湿度（0：乾燥～4：湿潤）
-        int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
-        if (0.2 * (vegetationIndex + 1) < random.nextFloat()) { // 湿度が低いほど枯れやすい
-            // 水中でないなら落ち葉を置く
-            if (fluidState.is(FluidTags.WATER) || !TreeShadeUtils.tryPlaceLeafLitter(level, pos, 1)) {
+        // Podzol以外では湿度に応じて確率で枯れる
+        // 湿度（0：乾燥～4：湿潤）{
+        if (!belowState.is(Blocks.PODZOL)) {
+            int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
+            if (0.1 * (vegetationIndex + 1) < random.nextFloat()) { // 湿度が低いほど枯れやすい
+                SaplingWitherUtil.witherItemSapling(level, pos);
                 return;
             }
         }

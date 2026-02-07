@@ -14,4 +14,12 @@ public class SaplingWitherUtil {
             TreeShadeUtils.placeLeafLitterRandomAmount(level, pos);
         }
     }
+    public static void witherItemSapling(Level level, BlockPos pos) {
+        FluidState fluidState = level.getFluidState(pos);
+        boolean isInWater = fluidState.is(FluidTags.WATER);
+        if (!isInWater) { // 水中なら落ち葉を置かない
+            TreeShadeUtils.tryPlaceLeafLitter(level, pos, 1);
+        }
+    }
+
 }

@@ -1,7 +1,6 @@
 package com.seral.mixin;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
@@ -26,52 +25,40 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.*;
 
 @Mixin(LeavesBlock.class)
-public class LeavesBlockMixin {
+public class TreeFallMixin {
 
     @Inject(method = "randomTick", at = @At("HEAD"), cancellable = true)
     public void onRandomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
 
-        // 確立を低くする
-        if (random.nextInt(100) + 1 <= 95) {
-            return;
-        }
+        DebugUtils.level = level;
 
         // プレイヤー建築保護
         if (state.getValue(BlockStateProperties.PERSISTENT)) {
             return;
         }
 
-        // 幹の探索開始 (真下)
-        BlockPos startLogPos = null;
-        BlockPos.MutableBlockPos cursor = pos.mutable().move(Direction.DOWN);
-        for (int i = 0; i < 10; i++) {
-            BlockState s = level.getBlockState(cursor);
-            if (s.is(BlockTags.LOGS)) {
-                startLogPos = cursor.immutable();
-                break;
-            }
-            if (!s.is(BlockTags.LEAVES)) {
-                return;
-            } // 障害物
-            cursor.move(Direction.DOWN);
-        }
-        if (startLogPos == null) {
+        // 湿度（0：乾燥～4：湿潤）
+        int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
+        // 湿度が高いほど倒れにくい
+        if (1.0f / (vegetationIndex + 2) < random.nextFloat()) {
             return;
         }
+
+        // 幹の探索開始 (真下)
+        BlockState belowState = level.getBlockState(pos.below());
+        if (!belowState.is(BlockTags.LOGS)) {
+            return;
+        }
+        BlockPos startLogPos = pos.below();
 
         TreeStructure tree = identifyWholeTree(level, startLogPos);
 
-        // 湿度に応じて確立で枯れる
-        // 湿度（0：乾燥～4：湿潤）
-        int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
-
-        // ランダムで倒す
-        if (1.0f / tree.logPositions.size() / (vegetationIndex + 1) < random.nextFloat()) {// 大きいほど、湿度が高いほど倒れにくい
+        if (1.0f / tree.logPositions.size() < random.nextFloat()) { // 大きいほど倒れにくい
             return;
         }
 
-        if (random.nextFloat() < 0.1f) {
-            System.out.println("Randomly knocking down tree at " + startLogPos);
+        if (random.nextFloat() < 0.03f) {
+            DebugUtils.p(startLogPos, 10, "Randomly knocking down tree at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
             knockDownTree(level, tree);
             return;
         }
@@ -80,7 +67,7 @@ public class LeavesBlockMixin {
         if (isInShade(level, tree.highestLogPos, 4)) {
             Block saplingBlock = LeafUtils.getSapling(level.getBlockState(pos).getBlock());
             if (!TreeShadeUtils.isShadeSapling(saplingBlock) || random.nextFloat() < 0.01) { // 陰樹は日陰でも倒れにくい
-                System.out.println("Knocking down tree at " + startLogPos + " due to shade.");
+                DebugUtils.p(startLogPos, 10, "Knocking down tree due to shade at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
                 knockDownTree(level, tree);
                 return;
             }
@@ -121,7 +108,7 @@ public class LeavesBlockMixin {
     // }
 
     // ほかの木によって日陰になっているかどうかの判定を行うヘルパーメソッド
-    // 上向きピラミッドの指定範囲内に葉ブロックが存在するかをチェックする
+    // 指定範囲内の明るさの平均を取る
     private static boolean isInShade(ServerLevel level, BlockPos pos, int radius) {
 
         DebugUtils.level = level;
@@ -168,14 +155,16 @@ public class LeavesBlockMixin {
     // 木を倒す
     private static void knockDownTree(ServerLevel level, TreeStructure tree) {
 
+        DebugUtils.level = level;
+
         // 木が地面に接していないのであれば処理を中止
         if (!level.getBlockState(tree.lowestLogPos.below()).is(BlockTags.DIRT)) {
             System.out.println("Aborting fallen tree removal because no dirt found below logs with lowest log at: " + tree.lowestLogPos);
             return;
         }
 
-        System.out.println("Removing " + tree.logPositions.size() + " logs and placing fallen tree at: " + tree.lowestLogPos);
-        System.out.println("/tp @s " + tree.lowestLogPos.getX() + " " + tree.lowestLogPos.getY() + " " + tree.lowestLogPos.getZ());
+        DebugUtils.p(tree.lowestLogPos, 10, "Removing " + tree.logPositions.size() + " logs and placing fallen tree at\n"
+            + "/tp @s " + tree.lowestLogPos.getX() + " " + tree.lowestLogPos.getY() + " " + tree.lowestLogPos.getZ());
 
         // 原木の消去
         for (BlockPos p : tree.logPositions) {
