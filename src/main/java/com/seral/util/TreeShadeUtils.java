@@ -6,8 +6,10 @@ import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -102,5 +104,50 @@ public final class TreeShadeUtils {
             Blocks.PALE_OAK_SAPLING
         );
         return shadeSaplings.contains(block);
+    }
+
+    // ほかの木によって日陰になっているかどうかの判定を行うヘルパーメソッド
+    // 指定範囲内の明るさの平均を取る
+    public static boolean isInShade(ServerLevel level, BlockPos pos, int radius) {
+
+        DebugUtils.level = level;
+
+        // 自分の葉
+        BlockPos thisLeafPos = pos.above();
+        BlockState thisLeafState = level.getBlockState(thisLeafPos);
+        Block thisLeaf = thisLeafState.getBlock();
+
+        if (!thisLeafState.is(BlockTags.LEAVES)) {
+            return true; // 何らかの理由でログの真上のブロックが葉ではないならば日陰とみなす
+        }
+
+        // 自分の葉から上に進み、最初の自分と同じ葉以外のブロックを探す
+        BlockPos abovePos = thisLeafPos;
+        for (int i = 0; i < 4; i++) { // 最初の葉の4つ上の葉まで自分の葉とみなす
+            abovePos = thisLeafPos.above(i + 1);
+            BlockState aboveState = level.getBlockState(abovePos);
+            if (aboveState.getBlock() != thisLeaf) {
+                break;
+            }
+        }
+
+        // 特定の範囲の明るさの平均値をとる
+        double sum = 0.0f;
+        int count = 0;
+        for (int i = -radius; i < radius + 1; i++) {
+            for (int j = -radius; j < radius + 1; j++) {
+                BlockPos lightPos = abovePos.offset(i, 0, j);
+                int brightness = level.getBrightness(LightLayer.SKY, lightPos);
+                if (brightness == 0) {
+                    continue;
+                }
+                sum += level.getBrightness(LightLayer.SKY, lightPos);
+                count += 1;
+            }
+        }
+        double averageBrightness = sum / count;
+        // System.out.println("Brightness: " + averageBrightness);
+
+        return averageBrightness < 14.75f;
     }
 }

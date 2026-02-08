@@ -5,7 +5,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -31,7 +30,7 @@ public class TreeFallMixin {
     public void onRandomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
 
         // ベースの確率
-        if (random.nextFloat() < 0.8f) {
+        if (random.nextFloat() < 0.7f) {
             return;
         }
 
@@ -45,18 +44,28 @@ public class TreeFallMixin {
         // 湿度（0：乾燥～4：湿潤）
         int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
         // 湿度が高いほど倒れにくい
-        if (1.0f / (vegetationIndex + 1.0f) < random.nextFloat()) {
+        if (1.0f / (2 * vegetationIndex + 1.0f) < random.nextFloat()) {
             return;
         }
 
-        // 幹の探索開始 (真下)
+        // 幹の真上
         BlockState belowState = level.getBlockState(pos.below());
         if (!belowState.is(BlockTags.LOGS)) {
             return;
         }
-        BlockPos startLogPos = pos.below();
 
+        BlockPos startLogPos = pos.below();
         TreeStructure tree = identifyWholeTree(level, startLogPos);
+
+        // 頂点にrandomTickが起こった時だけ
+        if (startLogPos.getY() != tree.highestLogPos.getY()) {
+            return;
+        }
+
+        // ハチの巣を持っていない
+        if (tree.hasBeehive) {
+            return;
+        }
 
         // 頂点が2x2の木は1ブロックの木と比べて4倍の確率で倒木判定が起きるため4分の1にする
         if (tree.has2x2Peak) {
@@ -65,6 +74,18 @@ public class TreeFallMixin {
             }
         }
 
+        // 頂点のログとその上の葉っぱの種類が異なるなら倒す
+        Block startLeavesBlock = level.getBlockState(pos).getBlock();
+        Block startLogBlock = level.getBlockState(startLogPos).getBlock();
+        if (startLeavesBlock != LeafUtils.getLeaves(startLogBlock)) {
+            if (!(startLeavesBlock == Blocks.OAK_LEAVES && startLogBlock == Blocks.JUNGLE_LOG)) { // jungle bushの組み合わせなら許容
+                DebugUtils.p(startLogPos, 50, "Knocking down wrong head tree at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
+                knockDownTree(level, tree);
+                return;
+            }
+        }
+
+        // ランダムで倒す
         if (random.nextFloat() < 0.05f) {
             DebugUtils.p(startLogPos, 50, "Randomly knocking down tree at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
             knockDownTree(level, tree);
@@ -72,7 +93,7 @@ public class TreeFallMixin {
         }
 
         // 日陰判定
-        if (isInShade(level, tree.highestLogPos, 4)) {
+        if (TreeShadeUtils.isInShade(level, tree.highestLogPos, 4)) {
             Block saplingBlock = LeafUtils.getSapling(level.getBlockState(pos).getBlock());
             if (!TreeShadeUtils.isShadeSapling(saplingBlock) || random.nextFloat() < 0.01) { // 陰樹は日陰でも倒れにくい
                 DebugUtils.p(startLogPos, 50, "Knocking down tree due to shade at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
@@ -115,51 +136,6 @@ public class TreeFallMixin {
     //     return null;
     // }
 
-    // ほかの木によって日陰になっているかどうかの判定を行うヘルパーメソッド
-    // 指定範囲内の明るさの平均を取る
-    private static boolean isInShade(ServerLevel level, BlockPos pos, int radius) {
-
-        DebugUtils.level = level;
-
-        // 自分の葉
-        BlockPos thisLeafPos = pos.above();
-        BlockState thisLeafState = level.getBlockState(thisLeafPos);
-        Block thisLeaf = thisLeafState.getBlock();
-
-        if (!thisLeafState.is(BlockTags.LEAVES)) {
-            return true; // 何らかの理由でログの真上のブロックが葉ではないならば日陰とみなす
-        }
-
-        // 自分の葉から上に進み、最初の自分と同じ葉以外のブロックを探す
-        BlockPos abovePos = thisLeafPos;
-        for (int i = 0; i < 4; i++) { // 最初の葉の4つ上の葉まで自分の葉とみなす
-            abovePos = thisLeafPos.above(i + 1);
-            BlockState aboveState = level.getBlockState(abovePos);
-            if (aboveState.getBlock() != thisLeaf) {
-                break;
-            }
-        }
-
-        // 特定の範囲の明るさの平均値をとる
-        double sum = 0.0f;
-        int count = 0;
-        for (int i = -radius; i < radius + 1; i++) {
-            for (int j = -radius; j < radius + 1; j++) {
-                BlockPos lightPos = abovePos.offset(i, 0, j);
-                int brightness = level.getBrightness(LightLayer.SKY, lightPos);
-                if (brightness == 0) {
-                    continue;
-                }
-                sum += level.getBrightness(LightLayer.SKY, lightPos);
-                count += 1;
-            }
-        }
-        double averageBrightness = sum / count;
-        // System.out.println("Brightness: " + averageBrightness);
-
-        return averageBrightness < 14.5f;
-    }
-
     // 木を倒す
     private static void knockDownTree(ServerLevel level, TreeStructure tree) {
 
@@ -189,6 +165,7 @@ public class TreeFallMixin {
         
         BlockPos lowestPos = startLogPos;
         BlockPos highestPos = startLogPos;
+        boolean hasBeehive = false;
 
         queue.add(startLogPos);
         visited.add(startLogPos);
@@ -215,7 +192,12 @@ public class TreeFallMixin {
                             continue;
                         }
                         BlockPos neighbor = current.offset(x, y, z);
-                        var neighborState = level.getBlockState(neighbor);
+                        BlockState neighborState = level.getBlockState(neighbor);
+
+                        if (neighborState.is(BlockTags.BEEHIVES)) {
+                            hasBeehive = true;
+                            continue;
+                        }
 
                         if (!neighborState.is(BlockTags.LOGS) 
                             && !neighborState.is(Blocks.MANGROVE_ROOTS)
@@ -242,6 +224,7 @@ public class TreeFallMixin {
         tree.lowestLogPos = lowestPos;
         tree.highestLogPos = highestPos;
         tree.has2x2Peak = has2x2Peak;
+        tree.hasBeehive = hasBeehive;
         return tree;
     }
 }

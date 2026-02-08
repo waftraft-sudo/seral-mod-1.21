@@ -33,7 +33,6 @@ public abstract class AutoPlantMixin {
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
 
-
         // Mixinの対象である ItemEntity 自身を取得
         ItemEntity itemEntity = (ItemEntity) (Object) this;
         ItemStack stack = itemEntity.getItem();
@@ -65,19 +64,6 @@ public abstract class AutoPlantMixin {
         if (itemEntity.getAge() < 6000 - 1) { // 5分ちょうどだと設置されないことがある
             return;
         }
-        
-        // 地面にある、またはマングローブの苗木で水中にある
-        if (!(itemEntity.onGround() || stack.is(Items.MANGROVE_PROPAGULE) && itemEntity.isInWater())) {
-            return;
-        }
-
-        // マングローブの苗木なら水の底まで移動
-        if (stack.is(Items.MANGROVE_PROPAGULE)) {
-            int distance = calcDistanceToWaterBottom(level, originalPos, 10);
-            if (0 < distance && distance < 5) {
-                itemEntity.setPos(itemEntity.getX(), itemEntity.getY() - distance, itemEntity.getZ());
-            }
-        }
 
         BlockPos pos = itemEntity.blockPosition();
         BlockState posState = level.getBlockState(pos);
@@ -86,7 +72,23 @@ public abstract class AutoPlantMixin {
         FluidState fluidState = level.getFluidState(pos);
         Block block = blockItem.getBlock();
 
-        // 設置場所が置き換え不可能なら終了
+        boolean isShadeSapling = TreeShadeUtils.isShadeSapling(block);
+        boolean isMangrovePropagule = stack.is(Items.MANGROVE_PROPAGULE);
+        
+        // 地面にある、またはマングローブの苗木で水中にある
+        if (!(itemEntity.onGround() || isMangrovePropagule && itemEntity.isInWater())) {
+            return;
+        }
+
+        // マングローブの苗木なら水の底まで移動
+        if (isMangrovePropagule) {
+            int distance = calcDistanceToWaterBottom(level, originalPos, 10);
+            if (0 < distance && distance < 5) {
+                itemEntity.setPos(itemEntity.getX(), itemEntity.getY() - distance, itemEntity.getZ());
+            }
+        }
+
+        // 設置場所が置き換え可能
         if (!posState.canBeReplaced()) {
             return;
         }
@@ -100,33 +102,40 @@ public abstract class AutoPlantMixin {
         // 湿度（0：乾燥～4：湿潤）{
         if (!belowState.is(Blocks.PODZOL)) {
             // 陰樹はPotzol以外では植わりにくい
-            if (TreeShadeUtils.isShadeSapling(block) && random.nextFloat() < 0.2f) {
+            if (isShadeSapling && random.nextFloat() < 0.2f) {
                 SaplingWitherUtil.witherItemSapling(level, pos);
                 return;
             }
             int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
-            if (0.02 * (vegetationIndex + 1) * (vegetationIndex + 1) < random.nextFloat()) { // 湿度が低いほど枯れやすい
+            if (0.04 * (vegetationIndex + 1) * (vegetationIndex + 1) < random.nextFloat()) { // 湿度が低いほど枯れやすい
                 DebugUtils.p(pos, 50, "withering with vegetation index: " + vegetationIndex);
                 SaplingWitherUtil.witherItemSapling(level, pos);
                 return;
             }
         }
         
-        // 空が見えて下が植えられるブロックなら苗木を置く
-        if (saplingState.canSurvive(level, pos) 
-            && level.canSeeSky(originalPos.above())) { // 空が見えるか確認するのは水底に沈む前の位置から
-            // 苗木を設置
-            if (saplingState.hasProperty(BlockStateProperties.WATERLOGGED) && fluidState.is(FluidTags.WATER)) {
-                // waterlog可能で水中ならwaterlog状態で植える
-                saplingState = saplingState.setValue(BlockStateProperties.WATERLOGGED, true);
-            }
-            level.setBlock(pos, saplingState, 3);
-        } else {
+        // 空が見えて下が植えられるブロック
+        if (!(saplingState.canSurvive(level, pos) && level.canSeeSky(originalPos.above()))) { // 空が見えるか確認するのは水底に沈む前の位置から
             // 水中でないなら落ち葉を置く
-            if (fluidState.is(FluidTags.WATER) || !TreeShadeUtils.tryPlaceLeafLitter(level, pos, 1)) {
+            if (!fluidState.is(FluidTags.WATER)) {
+                SaplingWitherUtil.witherItemSapling(level, pos);
+            }
+            return;
+        }
+
+        // 陽樹なら日陰ではない
+        if (!isShadeSapling) {
+            if (TreeShadeUtils.isInShade(level, pos, 4)) {
                 return;
             }
         }
+        
+        // 苗木を設置
+        if (saplingState.hasProperty(BlockStateProperties.WATERLOGGED) && fluidState.is(FluidTags.WATER)) {
+            // waterlog可能で水中ならwaterlog状態で植える
+            saplingState = saplingState.setValue(BlockStateProperties.WATERLOGGED, true);
+        }
+        level.setBlock(pos, saplingState, 3);
 
         // アイテムを消費
         consumeItem(itemEntity, stack);
