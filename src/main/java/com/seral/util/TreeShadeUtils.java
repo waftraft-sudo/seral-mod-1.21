@@ -106,8 +106,30 @@ public final class TreeShadeUtils {
         return shadeSaplings.contains(block);
     }
 
-    // ほかの木によって日陰になっているかどうかの判定を行うヘルパーメソッド
     // 指定範囲内の明るさの平均を取る
+    public static double getAreaAverageLight(ServerLevel level, BlockPos pos, int radius) {
+
+        // 特定の範囲の明るさの平均値をとる
+        double sum = 0.0f;
+        int count = 0;
+        for (int i = -radius; i < radius + 1; i++) {
+            for (int j = -radius; j < radius + 1; j++) {
+                BlockPos lightPos = pos.offset(i, 0, j);
+                int brightness = level.getBrightness(LightLayer.SKY, lightPos);
+                if (brightness == 0) {
+                    continue;
+                }
+                sum += level.getBrightness(LightLayer.SKY, lightPos);
+                count += 1;
+            }
+        }
+        double averageLight = sum / count;
+        // System.out.println("Brightness: " + averageBrightness);
+
+        return averageLight;
+    }
+
+    // ほかの木によって日陰になっているかどうかの判定を行うヘルパーメソッド
     public static boolean isInShade(ServerLevel level, BlockPos pos, int radius) {
 
         DebugUtils.level = level;
@@ -131,21 +153,7 @@ public final class TreeShadeUtils {
             }
         }
 
-        // 特定の範囲の明るさの平均値をとる
-        double sum = 0.0f;
-        int count = 0;
-        for (int i = -radius; i < radius + 1; i++) {
-            for (int j = -radius; j < radius + 1; j++) {
-                BlockPos lightPos = abovePos.offset(i, 0, j);
-                int brightness = level.getBrightness(LightLayer.SKY, lightPos);
-                if (brightness == 0) {
-                    continue;
-                }
-                sum += level.getBrightness(LightLayer.SKY, lightPos);
-                count += 1;
-            }
-        }
-        double averageBrightness = sum / count;
+        double averageBrightness = getAreaAverageLight(level, abovePos, radius);
         // System.out.println("Brightness: " + averageBrightness);
 
         return averageBrightness < 14.75f;

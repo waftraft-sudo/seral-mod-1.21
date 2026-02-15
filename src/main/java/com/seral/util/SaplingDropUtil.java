@@ -19,9 +19,9 @@ public class SaplingDropUtil {
         
         // ランダムな方向に飛ばす
         // random.nextGaussian() を使うと、自然なバラつきになる
-        double dx = random.nextGaussian() * 0.5f + (random.nextBoolean() ? 1.0f : -1.0f) * 1.5; // X方向の速度
+        double dx = random.nextGaussian() * 0.1f + (random.nextBoolean() ? 1.0f : -1.0f) * 0.5; // X方向の速度
         double dy = 0.01f;                        // Y方向（少し上に跳ねさせる）
-        double dz = random.nextGaussian() * 0.5f + (random.nextBoolean() ? 1.0f : -1.0f) * 1.5; // Z方向の速度
+        double dz = random.nextGaussian() * 0.1f + (random.nextBoolean() ? 1.0f : -1.0f) * 0.5; // Z方向の速度
 
         itemEntity.setDeltaMovement(dx, dy, dz);
         level.addFreshEntity(itemEntity);
