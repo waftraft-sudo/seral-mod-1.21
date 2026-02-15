@@ -1,6 +1,8 @@
 package com.seral.mixin;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
@@ -30,7 +32,7 @@ public class TreeFallMixin {
     public void onRandomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
 
         // ベースの確率
-        if (random.nextFloat() < 0.7f) {
+        if (random.nextFloat() < 0.5f) {
             return;
         }
 
@@ -56,6 +58,7 @@ public class TreeFallMixin {
 
         BlockPos startLogPos = pos.below();
         TreeStructure tree = identifyWholeTree(level, startLogPos);
+        int treeLogCount = tree.logPositions.size();
 
         // 頂点にrandomTickが起こった時だけ
         if (startLogPos.getY() != tree.highestLogPos.getY()) {
@@ -87,8 +90,11 @@ public class TreeFallMixin {
 
         // ランダムで倒す
         if (random.nextFloat() < 0.05f) {
-            DebugUtils.p(startLogPos, 50, "Randomly knocking down tree at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
+            DebugUtils.p(startLogPos, 100, "Randomly knocking down tree at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
             knockDownTree(level, tree);
+            if (random.nextFloat() < 0.1f && 4 < treeLogCount) {
+                placeFallenTree(level, tree.lowestLogPos, startLogBlock);
+            }
             return;
         }
 
@@ -96,45 +102,41 @@ public class TreeFallMixin {
         if (TreeShadeUtils.isInShade(level, tree.highestLogPos, 4)) {
             Block saplingBlock = LeafUtils.getSapling(level.getBlockState(pos).getBlock());
             if (!TreeShadeUtils.isShadeSapling(saplingBlock) || random.nextFloat() < 0.01) { // 陰樹は日陰でも倒れにくい
-                DebugUtils.p(startLogPos, 50, "Knocking down tree due to shade at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
+                DebugUtils.p(startLogPos, 100, "Knocking down tree due to shade at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
                 knockDownTree(level, tree);
+                if (random.nextFloat() < 0.1f && 4 < treeLogCount) {
+                    placeFallenTree(level, tree.lowestLogPos, startLogBlock);
+                }
                 return;
             }
         }
 
-        // // バニラの「倒木」Featureを配置
-        // // 木の種類（ブロックID）から、対応する Feature ID を決定
-        // Identifier featureId = getFallenTreeFeatureId(lowestLogState);
-        
-        // if (featureId != null) {
-        //     var registry = level.registryAccess().lookupOrThrow(Registries.CONFIGURED_FEATURE);
-        //     var featureOptional = registry.get(featureId);
-        //     if (featureOptional.isPresent()) {
-        //         var holder = featureOptional.get();
-        //         ConfiguredFeature<?, ?> feature = holder.value();
-        //         final BlockPos targetPos = lowestPos;           // make effectively final
-        //         feature.place(level, level.getChunkSource().getGenerator(), random, targetPos);
-        //     }
-        // }
     }
 
-    // // ブロックの種類から「倒木Feature」のIDを返すヘルパーメソッド
-    // private Identifier getFallenTreeFeatureId(BlockState logState) {
-    //     String path = "";
-        
-    //     // バニラの倒木IDは "fallen_樹種" という規則になっている
-    //     if (logState.is(Blocks.OAK_LOG)) path = "fallen_oak";
-    //     else if (logState.is(Blocks.BIRCH_LOG)) path = "fallen_birch";
-    //     else if (logState.is(Blocks.SPRUCE_LOG)) path = "fallen_spruce";
-    //     else if (logState.is(Blocks.JUNGLE_LOG)) path = "fallen_jungle";
-    //     // アカシアやダークオークなどはバニラに「倒木Feature」がない場合があるため
-    //     // 必要なら自作JSON ("lithoverdant:fallen_acacia"等) を指定するか、nullを返して何もしない
-        
-    //     if (!path.isEmpty()) {
-    //         return Identifier.tryParse("minecraft:" + path);
-    //     }
-    //     return null;
-    // }
+    // 倒木を置く
+    private static void placeFallenTree(ServerLevel level, BlockPos stumpPos, Block logBlock) {
+        RandomSource random = level.getRandom();
+        // 木の種類（ブロックID）から、対応する Feature ID を決定
+        Identifier featureId = TreeStructure.getFallenTreeFeatureId(logBlock);
+        if (featureId == null) {
+            // System.out.println("featureId is null");
+            // System.out.println("/tp @s " + stumpPos.getX() + " "  + stumpPos.getY() + " "  + stumpPos.getZ());
+            return;
+        }
+        var registry = level.registryAccess().lookupOrThrow(Registries.CONFIGURED_FEATURE);
+        var featureOptional = registry.get(featureId);
+        if (!featureOptional.isPresent()) {
+            System.out.println("No feature found for id: " + featureId.toString());
+            System.out.println("/tp @s " + stumpPos.getX() + " "  + stumpPos.getY() + " "  + stumpPos.getZ());
+            return;
+        }
+        var holder = featureOptional.get();
+        var feature = holder.value();
+        // System.out.println("Placing fallen tree with feature id: " + featureId.toString() + "\n"
+        //     + "/tp @s " + stumpPos.getX() + " "  + stumpPos.getY() + " "  + stumpPos.getZ()
+        // );
+        feature.place(level, level.getChunkSource().getGenerator(), random, stumpPos);
+    }
 
     // 木を倒す
     private static void knockDownTree(ServerLevel level, TreeStructure tree) {
