@@ -92,7 +92,7 @@ public class TreeFallMixin {
         if (random.nextFloat() < 0.05f) {
             DebugUtils.p(startLogPos, 100, "Randomly knocking down tree at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
             knockDownTree(level, tree);
-            if (random.nextFloat() < 0.1f && 4 < treeLogCount) {
+            if (random.nextFloat() < 0.1f && 4 < treeLogCount && treeLogCount < 20) {
                 placeFallenTree(level, tree.lowestLogPos, startLogBlock);
             }
             return;
@@ -104,7 +104,7 @@ public class TreeFallMixin {
             if (!TreeShadeUtils.isShadeSapling(saplingBlock) || random.nextFloat() < 0.01) { // 陰樹は日陰でも倒れにくい
                 DebugUtils.p(startLogPos, 100, "Knocking down tree due to shade at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
                 knockDownTree(level, tree);
-                if (random.nextFloat() < 0.1f && 4 < treeLogCount) {
+                if (random.nextFloat() < 0.1f && 4 < treeLogCount && treeLogCount < 20) {
                     placeFallenTree(level, tree.lowestLogPos, startLogBlock);
                 }
                 return;
