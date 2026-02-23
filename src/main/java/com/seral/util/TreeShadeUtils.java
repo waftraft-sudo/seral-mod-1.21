@@ -67,30 +67,33 @@ public final class TreeShadeUtils {
         return true;
     }
 
-    public static void placeLeafLitterRandomAmount(Level level, BlockPos pos) {
+    public static void placeLitterRandomAmount(Level level, BlockPos pos, Block litterBlock) {
         // 可能な枚数からランダムに1つ選ぶ
-        var possibleValues = BlockStateProperties.SEGMENT_AMOUNT.getPossibleValues();
+        var amountProperty = litterBlock == Blocks.PINK_PETALS ? BlockStateProperties.FLOWER_AMOUNT : BlockStateProperties.SEGMENT_AMOUNT;
+        var possibleValues = amountProperty.getPossibleValues();
         int amount = possibleValues.get(level.random.nextInt(possibleValues.size()));
-        tryPlaceLeafLitter(level, pos, amount);
+        tryPlaceLeafLitter(level, pos, amount, litterBlock);
     }
 
-    public static boolean tryPlaceLeafLitter(Level level, BlockPos pos, int amount) {
+    public static boolean tryPlaceLeafLitter(Level level, BlockPos pos, int amount, Block litterBlock) {
 
         BlockState posState = level.getBlockState(pos);
+        var amountProperty = litterBlock == Blocks.PINK_PETALS ? BlockStateProperties.FLOWER_AMOUNT : BlockStateProperties.SEGMENT_AMOUNT;
         Direction dir = Direction.Plane.HORIZONTAL.getRandomDirection(level.random);
-        if (posState.is(Blocks.LEAF_LITTER)) {
+
+        if (posState.is(litterBlock)) {
+            // 同じ種類のlitterがすでに置いてある場合
             dir = posState.getValue(BlockStateProperties.HORIZONTAL_FACING);
-            int maxLeafLitterAmount = Collections.max(BlockStateProperties.SEGMENT_AMOUNT.getPossibleValues());
-            int existingAmount = posState.getValue(BlockStateProperties.SEGMENT_AMOUNT);
+            int maxLeafLitterAmount = Collections.max(amountProperty.getPossibleValues());
+            int existingAmount = posState.getValue(amountProperty);
             if (maxLeafLitterAmount <= existingAmount) {
-                return false; // 既に最大量がある場合は置けない
+                return false; // 既に最大量がある場合は置かない
             }
-            amount += existingAmount;
-            amount = Math.min(amount, maxLeafLitterAmount);
+            amount = Math.min(amount + existingAmount, maxLeafLitterAmount);
         }
-        BlockState litterState = Blocks.LEAF_LITTER.defaultBlockState()
+        BlockState litterState = litterBlock.defaultBlockState()
             .setValue(BlockStateProperties.HORIZONTAL_FACING, dir)
-            .setValue(BlockStateProperties.SEGMENT_AMOUNT, amount);
+            .setValue(amountProperty, amount);
         level.setBlock(pos, litterState, 3);
         return true;
     }

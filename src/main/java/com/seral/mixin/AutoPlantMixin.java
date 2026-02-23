@@ -76,6 +76,9 @@ public abstract class AutoPlantMixin {
         boolean isMangrovePropagule = stack.is(Items.MANGROVE_PROPAGULE);
         boolean isSpruceSapling = (block == Blocks.SPRUCE_SAPLING);
         boolean isJungleSapling = (block == Blocks.JUNGLE_SAPLING);
+        boolean isCherrySapling = (block == Blocks.CHERRY_SAPLING);
+
+        Block litterBlock = isCherrySapling ? Blocks.PINK_PETALS : Blocks.LEAF_LITTER;
         
         // 地面にある、またはマングローブの苗木で水中にある
         if (!(itemEntity.onGround() || isMangrovePropagule && itemEntity.isInWater())) {
@@ -102,7 +105,8 @@ public abstract class AutoPlantMixin {
 
         // ベースの確率
         if (0.5f < random.nextFloat()) {
-            SaplingWitherUtil.witherItemSapling(level, pos);
+            SaplingWitherUtil.witherItemSapling(level, pos, litterBlock);
+            consumeItem(itemEntity, stack);
             return;
         }
         
@@ -111,7 +115,8 @@ public abstract class AutoPlantMixin {
         if (!belowState.is(Blocks.PODZOL)) {
             // 陰樹はPotzol以外では植わりにくい
             if (isShadeSapling && random.nextFloat() < 0.1f) {
-                SaplingWitherUtil.witherItemSapling(level, pos);
+                SaplingWitherUtil.witherItemSapling(level, pos, litterBlock);
+                consumeItem(itemEntity, stack);
                 return;
             }
 
@@ -119,21 +124,24 @@ public abstract class AutoPlantMixin {
             if (isSpruceSapling) {
                 if (random.nextFloat() < 0.08 * (temperatureIndex + 1) * (temperatureIndex + 1)) { // spruceは温度が高いほど枯れやすい
                     DebugUtils.p(pos, 50, "spruce sap withering with temperature index: " + temperatureIndex);
-                    SaplingWitherUtil.witherItemSapling(level, pos);
+                    SaplingWitherUtil.witherItemSapling(level, pos, litterBlock);
+                    consumeItem(itemEntity, stack);
                     return;
                 }
             }
             if (isJungleSapling) {
                 if (0.32 * (temperatureIndex + 1) * (temperatureIndex + 1) < random.nextFloat()) { // jungleは温度が低いほど枯れやすい
                     DebugUtils.p(pos, 50, "jungle sap withering with temperature index: " + temperatureIndex);
-                    SaplingWitherUtil.witherItemSapling(level, pos);
+                    SaplingWitherUtil.witherItemSapling(level, pos, litterBlock);
+                    consumeItem(itemEntity, stack);
                     return;
                 }
             }
             int vegetationIndex = BiomeUtils.getVegetationIndex(BiomeUtils.getRawVegetation(level, pos));
             if (0.16f * (vegetationIndex + 1.0f) * (vegetationIndex + 1.0f) < random.nextFloat()) { // 湿度が低いほど枯れやすい
                     DebugUtils.p(pos, 50, "withering with vegetation index: " + vegetationIndex);
-                SaplingWitherUtil.witherItemSapling(level, pos);
+                SaplingWitherUtil.witherItemSapling(level, pos, litterBlock);
+                consumeItem(itemEntity, stack);
                 return;
             }
         }
@@ -141,7 +149,8 @@ public abstract class AutoPlantMixin {
         // 空が見えて下が植えられるブロック
         if (!(saplingState.canSurvive(level, pos) && level.canSeeSky(originalPos.above()))) { // 空が見えるか確認するのは水底に沈む前の位置から
             DebugUtils.p(pos, 50, "can't see sky");
-            SaplingWitherUtil.witherItemSapling(level, pos);
+            SaplingWitherUtil.witherItemSapling(level, pos, litterBlock);
+            consumeItem(itemEntity, stack);
             return;
         }
 
@@ -150,7 +159,8 @@ public abstract class AutoPlantMixin {
             if (TreeShadeUtils.getAreaAverageLight(level, pos, 4) < 14.5f) {
                 double light = TreeShadeUtils.getAreaAverageLight(level, pos, 4);
                 DebugUtils.p(pos, 50, "light sapling withering due to shade: " + light);
-                SaplingWitherUtil.witherItemSapling(level, pos);
+                SaplingWitherUtil.witherItemSapling(level, pos, litterBlock);
+                consumeItem(itemEntity, stack);
                 return;
             }
         }

@@ -120,8 +120,7 @@ public class SaplingGrowthMixin {
         }
         if (maxFitness == 0) {
             if (random.nextFloat() < 0.1f) {
-                level.removeBlock(pos, false);
-                TreeShadeUtils.placeLeafLitterRandomAmount(level, pos);
+                SaplingWitherUtil.witherSapling(level, pos);
                 // 2x2になれないなら確率で消える
             }
             return false;
