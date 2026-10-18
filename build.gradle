@@ -14,6 +14,9 @@ repositories {
 	// for more information about repositories.
 }
 
+def playerName = project.findProperty("player_name") ?: "seral_player"
+def playerUuid = project.findProperty("player_uuid") ?: "11111111-2222-3333-4444-555555555555"
+
 loom {
 	splitEnvironmentSourceSets()
 
@@ -24,14 +27,12 @@ loom {
 		}
 	}
 
-}
-
-def playerName = project.findProperty("player_name") ?: "seral_player"
-def playerUuid = project.findProperty("player_uuid") ?: "11111111-2222-3333-4444-555555555555"
-
-tasks.named("runClient") {
-	args "--username", playerName
-	args "--uuid", playerUuid
+	runs {
+		// runClientとIDEの起動設定（gradlew vscode等）の両方に固定のプレイヤーを渡す
+		client {
+			programArgs "--username", playerName, "--uuid", playerUuid
+		}
+	}
 }
 
 dependencies {
