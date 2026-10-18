@@ -44,7 +44,7 @@ public abstract class AutoPlantMixin {
         }
         ServerLevel level = (ServerLevel) itemLevel;
 
-        RandomSource random = level.random;
+        RandomSource random = level.getRandom();
         
         DebugUtils.level = level;
 

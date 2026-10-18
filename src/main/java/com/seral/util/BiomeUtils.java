@@ -1,7 +1,9 @@
 package com.seral.util;
 
 import net.minecraft.world.level.biome.OverworldBiomeBuilder;
-import net.minecraft.world.level.levelgen.DensityFunction;
+import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.NoiseRouter;
+import net.minecraft.world.level.levelgen.NoiseRouterData;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -41,18 +43,10 @@ public final class BiomeUtils {
 
     // 指定した位置の生の気温値を取得するヘルパーメソッド
     public static double getRawTemperature(ServerLevel level, BlockPos pos) {
-        RandomState randomState = level.getChunkSource().randomState(); 
+        RandomState randomState = level.getChunkSource().randomState();
 
-        // 2. .temperature() → .temperature() (同じ)
-        // NoiseRouter は同じ名前ですが、取得元が randomState になります
-        DensityFunction tempFunction = randomState.router().temperature();
-
-        // 3. 計算実行
-        return tempFunction.compute(new DensityFunction.SinglePointContext(
-            pos.getX(),
-            pos.getY(),
-            pos.getZ()
-        ));
+        // 26.3からRandomStateがNoiseRouterを公開しなくなったので、ジェネレーター設定から取得してRandomStateで評価する
+        return randomState.sampleBlockValueUncached(getNoiseRouter(level).temperature(), pos.getX(), pos.getY(), pos.getZ());
     }
 
     /**
@@ -76,12 +70,14 @@ public final class BiomeUtils {
         RandomState randomState = level.getChunkSource().randomState();
 
         // NoiseRouterから .vegetation() を取得します
-        DensityFunction vegFunction = randomState.router().vegetation();
+        return randomState.sampleBlockValueUncached(getNoiseRouter(level).vegetation(), pos.getX(), pos.getY(), pos.getZ());
+    }
 
-        return vegFunction.compute(new DensityFunction.SinglePointContext(
-            pos.getX(),
-            pos.getY(),
-            pos.getZ()
-        ));
+    // ノイズ生成でないワールド（スーパーフラット等）ではバニラと同様に空のNoiseRouterを使う
+    private static NoiseRouter getNoiseRouter(ServerLevel level) {
+        if (level.getChunkSource().getGenerator() instanceof NoiseBasedChunkGenerator noiseGenerator) {
+            return noiseGenerator.generatorSettings().value().noiseRouter();
+        }
+        return NoiseRouterData.none();
     }
 }

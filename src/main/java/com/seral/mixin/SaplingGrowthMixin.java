@@ -10,7 +10,7 @@ import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.SaplingBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
+import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
 
@@ -80,11 +80,11 @@ public class SaplingGrowthMixin {
         // ジャングルの苗木なら確率でjungle bushになる
         if (state.is(Blocks.JUNGLE_SAPLING) && random.nextFloat() < 0.01f) {
             
-            ResourceKey<ConfiguredFeature<?, ?>> featureKey = 
-                ResourceKey.create(Registries.CONFIGURED_FEATURE, Identifier.tryParse("minecraft:jungle_bush"));
+            ResourceKey<Feature> featureKey = 
+                ResourceKey.create(Registries.FEATURE, Identifier.tryParse("minecraft:jungle_bush"));
 
             // レジストリから設定を取得して木を生成
-            level.registryAccess().lookupOrThrow(Registries.CONFIGURED_FEATURE)
+            level.registryAccess().lookupOrThrow(Registries.FEATURE)
                 .get(featureKey)
                 .ifPresent(feature -> {
                     // 苗木を消して木を置く

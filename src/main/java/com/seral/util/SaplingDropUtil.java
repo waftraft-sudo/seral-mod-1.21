@@ -9,7 +9,7 @@ import net.minecraft.world.level.Level;
 public class SaplingDropUtil {
     
     public static void popSapling(Level level, BlockPos pos, ItemStack itemStack) {
-        RandomSource random = level.random;
+        RandomSource random = level.getRandom();
 
         // 苗木が見つかったらスポーンさせる
         ItemEntity itemEntity = new ItemEntity(level, 

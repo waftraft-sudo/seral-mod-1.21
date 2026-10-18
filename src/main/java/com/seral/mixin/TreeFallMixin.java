@@ -123,7 +123,7 @@ public class TreeFallMixin {
             // System.out.println("/tp @s " + stumpPos.getX() + " "  + stumpPos.getY() + " "  + stumpPos.getZ());
             return;
         }
-        var registry = level.registryAccess().lookupOrThrow(Registries.CONFIGURED_FEATURE);
+        var registry = level.registryAccess().lookupOrThrow(Registries.FEATURE);
         var featureOptional = registry.get(featureId);
         if (!featureOptional.isPresent()) {
             System.out.println("No feature found for id: " + featureId.toString());

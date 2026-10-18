@@ -71,7 +71,7 @@ public final class TreeShadeUtils {
         // 可能な枚数からランダムに1つ選ぶ
         var amountProperty = litterBlock == Blocks.PINK_PETALS ? BlockStateProperties.FLOWER_AMOUNT : BlockStateProperties.SEGMENT_AMOUNT;
         var possibleValues = amountProperty.getPossibleValues();
-        int amount = possibleValues.get(level.random.nextInt(possibleValues.size()));
+        int amount = possibleValues.get(level.getRandom().nextInt(possibleValues.size()));
         tryPlaceLeafLitter(level, pos, amount, litterBlock);
     }
 
@@ -79,7 +79,7 @@ public final class TreeShadeUtils {
 
         BlockState posState = level.getBlockState(pos);
         var amountProperty = litterBlock == Blocks.PINK_PETALS ? BlockStateProperties.FLOWER_AMOUNT : BlockStateProperties.SEGMENT_AMOUNT;
-        Direction dir = Direction.Plane.HORIZONTAL.getRandomDirection(level.random);
+        Direction dir = Direction.Plane.HORIZONTAL.getRandomDirection(level.getRandom());
 
         if (posState.is(litterBlock)) {
             // 同じ種類のlitterがすでに置いてある場合
