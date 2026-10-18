@@ -19,7 +19,8 @@ public class TreeStructure {
         Blocks.OAK_LOG, "fallen_oak_tree",
         Blocks.BIRCH_LOG, "fallen_birch_tree",
         Blocks.SPRUCE_LOG, "fallen_spruce_tree",
-        Blocks.JUNGLE_LOG, "fallen_jungle_tree"
+        Blocks.JUNGLE_LOG, "fallen_jungle_tree",
+        Blocks.POPLAR_LOG, "fallen_poplar_tree"
     );
 
     public TreeStructure() {}

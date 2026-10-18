@@ -80,7 +80,7 @@ public class TreeFallMixin {
         // 頂点のログとその上の葉っぱの種類が異なるなら倒す
         Block startLeavesBlock = level.getBlockState(pos).getBlock();
         Block startLogBlock = level.getBlockState(startLogPos).getBlock();
-        if (startLeavesBlock != LeafUtils.getLeaves(startLogBlock)) {
+        if (!LeafUtils.isLeavesOf(startLogBlock, startLeavesBlock)) {
             if (!(startLeavesBlock == Blocks.OAK_LEAVES && startLogBlock == Blocks.JUNGLE_LOG)) { // jungle bushの組み合わせなら許容
                 DebugUtils.p(startLogPos, 50, "Knocking down wrong head tree at:\n" + "/tp @s " + startLogPos.getX() + " "  + startLogPos.getY() + " "  + startLogPos.getZ());
                 knockDownTree(level, tree);
