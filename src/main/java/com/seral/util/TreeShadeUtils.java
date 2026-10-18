@@ -155,6 +155,9 @@ public final class TreeShadeUtils {
                 break;
             }
         }
+        if (thisLeaf == Blocks.MANGROVE_LEAVES) {
+            abovePos = abovePos.above(1); // マングローブの葉は頂点がへこんでいることがあるため一つ上のブロックからチェックする
+        }
 
         double averageBrightness = getAreaAverageLight(level, abovePos, radius);
         // System.out.println("Brightness: " + averageBrightness);
